@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
  * 一副没 root 的样子。想解除隐身，就得用拨号盘输入密令（默认 {@code *#*#70707#*#*}）。
  *
  * 这个 App 就是这个入口：它把输入的密令通过一条<b>非受保护</b>的自定义广播
- * {@code com.qiangge.ksu.action.STEALTH_CODE} 发给管理器，
+ * {@code com.qiangge.ksu.action.STEALTH_CODE} <b>定向（setPackage）</b>发给管理器，
  * 管理器校验发送方「与本 App 同一签名」+ 密令数字后，就会关闭隐身、恢复真正的界面。
  *
  * （不能用标准的 {@code android.provider.Telephony.SECRET_CODE}：那条是受保护广播，
@@ -41,6 +41,12 @@ public class MainActivity extends Activity {
             Pattern.compile("^\\*#(\\d{4,12})#\\*#\\*$");
 
     private static final int REQ_CALL_PHONE = 1001;
+
+    /** 管理器包名 —— 密令广播必须「定向」发给它，理由见 {@link #sendSecret} */
+    private static final String MANAGER_PACKAGE = "com.qiangge.ksu";
+
+    /** 管理器侧 StealthReceiver 收的自定义 action（非受保护广播，见其源码注释） */
+    private static final String ACTION_STEALTH_CODE = MANAGER_PACKAGE + ".action.STEALTH_CODE";
 
     private EditText input;
 
@@ -200,10 +206,19 @@ public class MainActivity extends Activity {
      * 电话进程发得出去，普通 App 一发就抛 SecurityException —— 直接闪退。
      * 所以这里发管理器另外开的一条<b>非受保护</b>自定义广播，管理器按「同签名」放行
      * （见管理器 StealthReceiver 的处理）。
+     *
+     * ⚠️ 必须 {@code setPackage} 定向发给管理器。Android 8.0（API 26）起，清单里声明的
+     * receiver <b>收不到「隐式广播」</b>—— 官方文档原文：「apps that target the API level 26
+     * or higher can't register broadcast receivers for implicit broadcasts in their manifest
+     * <b>unless the broadcast is sent specifically to them</b>」。
+     * 我们这条自定义 action 不在官方「隐式广播豁免名单」里，不定向就会被系统直接丢掉：
+     * 广播确实发出去了、接收方也声明了，但两边永远碰不上 —— 现象就是「点密令毫无反应」。
+     * （系统拨号盘那条 SECRET_CODE 能通，是因为它在豁免名单里。）
      */
     private void sendSecret(String digits) {
-        Intent intent = new Intent("com.qiangge.ksu.action.STEALTH_CODE");
+        Intent intent = new Intent(ACTION_STEALTH_CODE);
         intent.putExtra("code", digits);
+        intent.setPackage(MANAGER_PACKAGE);
         try {
             sendBroadcast(intent);
             Toast.makeText(this, R.string.toast_secret_sent, Toast.LENGTH_SHORT).show();
