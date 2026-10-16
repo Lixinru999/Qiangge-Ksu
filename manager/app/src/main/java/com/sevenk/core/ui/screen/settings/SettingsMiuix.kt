@@ -37,6 +37,7 @@ import androidx.compose.material.icons.rounded.DisplaySettings
 import androidx.compose.material.icons.rounded.FlashOn
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.LayersClear
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.RestartAlt
@@ -221,6 +222,8 @@ fun SettingPagerMiuix(
     var gravityMode by remember { mutableStateOf(prefsRepo.gravityMode) }
     // 隐身密令(拨号数字)
     var stealthCode by remember { mutableStateOf(prefsRepo.stealthCode) }
+    // 彻底隐藏：隐身模式下划掉后台自动隐藏桌面图标，只能拨号密令恢复。
+    var deepHideEnabled by remember { mutableStateOf(prefsRepo.deepHideEnabled) }
     // 网页管理器：服务在 ksud（root 守护进程）里，这里只管开关与地址。
     // 地址要起 root shell 才能读到，所以异步取，别卡住界面。
     val webAdminScope = rememberCoroutineScope()
@@ -1119,6 +1122,41 @@ fun SettingPagerMiuix(
                                         com.sevenk.core.core.utils.AppExecutors.io.execute {
                                             com.sevenk.core.ui.security.StealthCodeStore.write(code)
                                         }
+                                    }
+                                }
+                            )
+                            // 彻底隐藏(v2.32):隐身模式下划掉后台 → 桌面图标自动消失,
+                            // 只能拨 *#*#626725#*#* 恢复。需要先开隐身模式才有效。
+                            SwitchPreference(
+                                title = "彻底隐藏",
+                                summary = if (!com.sevenk.core.ui.security.Stealth.isEnabled())
+                                    "需先开启「隐身模式」才生效;开启后划掉后台自动隐藏图标,只能拨号密令恢复"
+                                else if (deepHideEnabled)
+                                    "已开启:划掉后台后桌面图标会消失,拨 *#*#${stealthCode}#*#* 恢复"
+                                else
+                                    "开启后,隐身模式下划掉后台自动隐藏桌面图标,只能拨号密令恢复",
+                                startAction = {
+                                    Icon(
+                                        Icons.Rounded.Lock,
+                                        modifier = Modifier.padding(end = 6.dp),
+                                        contentDescription = "彻底隐藏",
+                                        tint = colorScheme.onBackground
+                                    )
+                                },
+                                checked = deepHideEnabled,
+                                onCheckedChange = { v ->
+                                    if (v && !com.sevenk.core.ui.security.Stealth.isEnabled()) {
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            "请先开启「隐身模式」",
+                                            android.widget.Toast.LENGTH_LONG
+                                        ).show()
+                                        return@SwitchPreference
+                                    }
+                                    deepHideEnabled = v
+                                    prefsRepo.deepHideEnabled = v
+                                    if (!v) {
+                                        com.sevenk.core.ui.security.Stealth.ensureLauncherVisible(context)
                                     }
                                 }
                             )

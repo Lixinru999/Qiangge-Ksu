@@ -107,6 +107,12 @@ interface SettingsRepository {
     var stealthCode: String
 
     /**
+     * 彻底隐藏：开启后，隐身模式下管理器后台被划掉时自动隐藏桌面图标，
+     * 只能通过拨号密令恢复。需配合隐身模式使用。
+     */
+    var deepHideEnabled: Boolean
+
+    /**
      * 网页管理器的开关（**只是界面上的开关状态**）。
      *
      * 真正的服务跑在 **ksud（root 守护进程）** 里，配置和口令存在

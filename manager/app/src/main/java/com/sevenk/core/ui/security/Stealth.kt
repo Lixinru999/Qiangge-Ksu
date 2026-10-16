@@ -150,18 +150,62 @@ object Stealth {
     /**
      * 确保桌面图标在。每次启动、开机都调一次 ——
      * 既保证正常状态下图标一定存在,也顺手把旧版本藏起来的图标找回来。
+     *
+     * ⚠️ 彻底隐藏(v2.32):若用户开启了「彻底隐藏」且当前隐身开着,
+     *    这里**不恢复图标**,反而保持隐藏 —— 否则开机/重启后图标自己冒出来,
+     *    彻底隐藏就穿帮了。只有拨号密令恢复(隐身被关掉)时才会真正恢复图标。
      */
     fun ensureLauncherVisible(context: Context) {
         Thread {
             runCatching {
                 val pm = context.packageManager
                 val component = ComponentName(context.packageName, LAUNCHER_ALIAS)
+                // 彻底隐藏开着 + 隐身开着 → 保持图标隐藏,不要恢复
+                val deepHide = runCatching {
+                    com.sevenk.core.data.repository.SettingsRepositoryImpl().deepHideEnabled
+                }.getOrDefault(false)
+                if (deepHide && kernelState() == 1) {
+                    if (pm.getComponentEnabledSetting(component) !=
+                        PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+                    ) {
+                        pm.setComponentEnabledSetting(
+                            component,
+                            PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                            PackageManager.DONT_KILL_APP
+                        )
+                    }
+                    return@runCatching
+                }
                 if (pm.getComponentEnabledSetting(component) !=
                     PackageManager.COMPONENT_ENABLED_STATE_ENABLED
                 ) {
                     pm.setComponentEnabledSetting(
                         component,
                         PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                        PackageManager.DONT_KILL_APP
+                    )
+                }
+            }
+        }.start()
+    }
+
+    /**
+     * 彻底隐藏:禁用桌面启动器组件,让桌面图标消失。
+     *
+     * 只能通过拨号密令([StealthReceiver])恢复 —— 恢复时会调 [ensureLauncherVisible],
+     * 而那一刻隐身已被关掉,所以图标会正常恢复。
+     */
+    fun hideLauncher(context: Context) {
+        Thread {
+            runCatching {
+                val pm = context.packageManager
+                val component = ComponentName(context.packageName, LAUNCHER_ALIAS)
+                if (pm.getComponentEnabledSetting(component) !=
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+                ) {
+                    pm.setComponentEnabledSetting(
+                        component,
+                        PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
                         PackageManager.DONT_KILL_APP
                     )
                 }

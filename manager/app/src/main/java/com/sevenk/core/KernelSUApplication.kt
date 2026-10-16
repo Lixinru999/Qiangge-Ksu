@@ -7,6 +7,9 @@ import android.os.Build
 import android.os.UserManager
 import android.system.Os
 import android.util.Log
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import com.sevenk.core.core.crash.CrashEvidenceClassifier
@@ -187,7 +190,7 @@ private fun collectAndStorePreviousCrash(context: Context) {
                 // 🔴 v2.14：这不是 App 崩了 —— 是 ksud / 内核探测的**子进程**被系统
                 // （seccomp/SIGSYS 之类）拦下或杀掉。App 进程活得好好的。
                 // 以前这里会写 last_crash.txt 并弹「崩溃上报」，用户就以为"闪退"。
-                // 现在只留一行日志（真机上 `logcat -s Qiangge` 能看到），不打扰用户。
+                // 现在只留一行日志（真机上 `logcat -s 7kkernel` 能看到），不打扰用户。
                 Log.i(TAG, "崩溃上报:确认是内核探测子进程被系统拦下(非 App 崩溃),只记日志不上报")
                 return@runCatching
             }
@@ -421,6 +424,22 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
         //    它在 onCreate 里,一抛就是启动即闪退。包起来后最坏只是 rust 的 temp_dir() 用默认值。
         runCatching { Os.setenv("TMPDIR", cacheDir.absolutePath, true) }
             .onFailure { Log.w(TAG, "设置 TMPDIR 失败(忽略): ", it) }
+
+        // ── 彻底隐藏(v2.32):应用进入后台时自动隐藏桌面图标 ──────────────
+        // 仅当「彻底隐藏」开关开着 且 隐身模式开着时才生效。
+        // 用户划掉管理器后台 → onStop → 禁用启动器组件 → 桌面图标消失。
+        // 恢复只能靠拨号密令(StealthReceiver 关隐身 + ensureLauncherVisible)。
+        runCatching {
+            val prefs = SettingsRepositoryImpl()
+            ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
+                override fun onStop(owner: LifecycleOwner) {
+                    if (prefs.deepHideEnabled && com.sevenk.core.ui.security.Stealth.isEnabled()) {
+                        com.sevenk.core.ui.security.Stealth.hideLauncher(ksuApp)
+                        Log.i(TAG, "彻底隐藏:应用进入后台,已隐藏桌面图标")
+                    }
+                }
+            })
+        }.onFailure { Log.w(TAG, "注册彻底隐藏后台监听失败(忽略): ", it) }
     }
 
     override val viewModelStore: ViewModelStore

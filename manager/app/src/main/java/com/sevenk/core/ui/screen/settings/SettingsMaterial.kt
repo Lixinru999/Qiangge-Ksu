@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.DisplaySettings
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LayersClear
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.RestartAlt
@@ -145,6 +146,9 @@ fun SettingPagerMaterial(
         }
         if (real.isNotBlank() && real != stealthCode) stealthCode = real
     }
+
+    // 彻底隐藏：隐身模式下划掉后台自动隐藏桌面图标，只能拨号密令恢复。
+    var deepHideEnabled by remember { mutableStateOf(prefsRepo.deepHideEnabled) }
 
     // 网页管理器：服务在 ksud（root 守护进程）里，这里只管开关与地址。
     // 地址要起 root shell 才能读到，所以异步取，别卡住界面。
@@ -987,6 +991,38 @@ fun SettingPagerMaterial(
                                         com.sevenk.core.core.utils.AppExecutors.io.execute {
                                             com.sevenk.core.ui.security.StealthCodeStore.write(code)
                                         }
+                                    }
+                                }
+                            )
+                        }
+                        // 彻底隐藏(v2.32):隐身模式下划掉后台 → 桌面图标自动消失,
+                        // 只能拨 *#*#626725#*#* 恢复。需要先开隐身模式才有效。
+                        add {
+                            val stealthOn = com.sevenk.core.ui.security.Stealth.isEnabled()
+                            SegmentedSwitchItem(
+                                icon = Icons.Filled.Lock,
+                                title = "彻底隐藏",
+                                summary = if (!stealthOn)
+                                    "需先开启「隐身模式」才生效;开启后划掉后台自动隐藏图标,只能拨号密令恢复"
+                                else if (deepHideEnabled)
+                                    "已开启:划掉后台后桌面图标会消失,拨 *#*#${stealthCode}#*#* 恢复"
+                                else
+                                    "开启后,隐身模式下划掉后台自动隐藏桌面图标,只能拨号密令恢复",
+                                checked = deepHideEnabled,
+                                onCheckedChange = { v ->
+                                    if (v && !stealthOn) {
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            "请先开启「隐身模式」",
+                                            android.widget.Toast.LENGTH_LONG
+                                        ).show()
+                                        return@SegmentedSwitchItem
+                                    }
+                                    deepHideEnabled = v
+                                    prefsRepo.deepHideEnabled = v
+                                    if (!v) {
+                                        // 关闭彻底隐藏时立刻把图标恢复回来
+                                        com.sevenk.core.ui.security.Stealth.ensureLauncherVisible(context)
                                     }
                                 }
                             )

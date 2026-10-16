@@ -204,6 +204,10 @@ class SettingsRepositoryImpl : SettingsRepository {
         }
         set(value) = prefs.edit { putString("stealth_code", value) }
 
+    override var deepHideEnabled: Boolean
+        get() = prefs.getBoolean("deep_hide_enabled", false)
+        set(value) = prefs.edit { putBoolean("deep_hide_enabled", value) }
+
     // 网页管理器开关（只是界面状态；服务与口令都在 ksud 侧）
     // ⚠️ 键名保留 v0.13.77 的 web_terminal_enabled：换键会让老用户的开关被重置。
     override var webAdminEnabled: Boolean
