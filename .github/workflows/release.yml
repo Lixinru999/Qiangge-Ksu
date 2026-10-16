@@ -17,6 +17,10 @@ jobs:
       - build-manager
       - build-phone
     runs-on: ubuntu-latest
+    # 没有这个，GITHUB_TOKEN 默认只读，创建 Release 会 403
+    # "Resource not accessible by integration"（实测踩过）。
+    permissions:
+      contents: write
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v8
