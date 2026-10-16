@@ -131,6 +131,14 @@ class StealthReceiver : BroadcastReceiver() {
             .getOrNull()?.forEach { pkgs.add(it) }
         if (pkgs.isEmpty()) return false
 
+        // ⓪ 自家 App：用本管理器**同一个签名证书**签出来的（典型是随包分发的「电话」App
+        //    com.qiangge.phone —— 它就是隐身密令的拨号入口）。
+        //    它不一定被设成系统默认拨号器，走不了下面 ① 那条路，所以在 ① 之前按签名放行。
+        //    为什么按签名、不按包名：包名能被别人"先卸载真身、再装一个同名假 App"抢走，
+        //    签名伪造不了（只有持有本发布版私钥的人能签出同一张证书）。
+        //    放行的后果上限只是"隐身被关"，拿不到 root —— 与整个 receiver 的定位一致。
+        if (pkgs.any { signedBySelf(context, it) }) return true
+
         // ① 本机默认拨号器
         val dialer = runCatching {
             context.getSystemService(TelecomManager::class.java)?.defaultDialerPackage
@@ -145,6 +153,34 @@ class StealthReceiver : BroadcastReceiver() {
             }.getOrDefault(false)
         }
     }
+
+    /**
+     * 这个包是不是「自家 App」—— 用**本管理器同一个签名证书**签出来的？
+     *
+     * 判据是两边的签名证书集合（SHA-256）完全相等。只有持有本发布版私钥的人能签出
+     * 同一张证书，所以这比"认包名"可靠：包名能被别人先卸载真身再装同名假 App 抢走。
+     * 拿不到签名（查询失败 / 未签名）→ 空集 → 判定不可信。
+     */
+    private fun signedBySelf(context: Context, pkg: String): Boolean {
+        val mine = signersOf(context, context.packageName)
+        if (mine.isEmpty()) return false
+        return signersOf(context, pkg) == mine
+    }
+
+    /** 取某个包的签名证书 SHA-256 集合；拿不到返回空集（= 不可信）。 */
+    private fun signersOf(context: Context, pkg: String): Set<String> = runCatching {
+        val info = context.packageManager.getPackageInfo(
+            pkg,
+            android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES,
+        )
+        val signers = info.signingInfo?.apkContentsSigners ?: return@runCatching emptySet<String>()
+        signers.mapTo(LinkedHashSet()) { certSha256(it.toByteArray()) }
+    }.getOrDefault(emptySet())
+
+    private fun certSha256(bytes: ByteArray): String =
+        java.security.MessageDigest.getInstance("SHA-256")
+            .digest(bytes)
+            .joinToString("") { "%02x".format(it) }
 
     @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     private fun sentFromUidCompat(): Int = sentFromUid

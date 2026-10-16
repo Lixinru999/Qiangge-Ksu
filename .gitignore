@@ -14,3 +14,12 @@ __pycache__
 .cxx/
 build/
 *.apk
+
+# 本机相关配置（各人 SDK 路径不同，不应入库）
+local.properties
+
+# 本地下载/构建暂存（不应入库）
+/ci-artifacts/
+/dl/
+/lkm/
+/release/

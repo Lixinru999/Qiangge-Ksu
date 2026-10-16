@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">电话</string>
+    <string name="hint">输入密令（默认 *#*#70707#*#*），点「拨号」或「密令」即可解除管理器隐身</string>
+    <string name="input_hint">输入号码或密令</string>
+    <string name="key_back">退格</string>
+    <string name="key_dial">拨号</string>
+    <string name="key_secret">密令</string>
+    <string name="toast_secret_sent">密令已发送</string>
+    <string name="toast_empty">请先输入号码或密令</string>
+    <string name="toast_need_digits">密令必须是数字</string>
+    <string name="toast_no_call_permission">未授予通话权限，已打开系统拨号盘</string>
+</resources>
