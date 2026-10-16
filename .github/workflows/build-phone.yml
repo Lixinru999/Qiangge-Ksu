@@ -39,20 +39,22 @@ jobs:
     - name: Decode signing keystore
       if: github.event_name != 'pull_request'
       run: |
-        echo "${{ secrets.KEYSTORE }}" | base64 -d > key.jks
+        KS_PATH="${GITHUB_WORKSPACE}/phone-app/key.jks"
+        echo "${{ secrets.KEYSTORE }}" | base64 -d > "$KS_PATH"
         {
           echo KEYSTORE_PASSWORD='${{ secrets.KEYSTORE_PASSWORD }}'
           echo KEY_ALIAS='${{ secrets.KEY_ALIAS }}'
           echo KEY_PASSWORD='${{ secrets.KEY_PASSWORD }}'
-          echo KEYSTORE_FILE='key.jks'
+          echo "KEYSTORE_FILE=${KS_PATH}"
         } >> gradle.properties
 
     - name: Decode PR signing keystore
       if: github.event_name == 'pull_request'
       run: |
+        KS_PATH="${GITHUB_WORKSPACE}/phone-app/pr-key.jks"
         # PR 无法访问本仓库 Secrets，生成一次性临时密钥，够编译就行
         keytool -genkeypair -v \
-          -keystore pr-key.jks \
+          -keystore "$KS_PATH" \
           -storepass prpass123 \
           -keypass prkey123 \
           -alias pr-key \
@@ -63,7 +65,7 @@ jobs:
           echo KEYSTORE_PASSWORD='prpass123'
           echo KEY_ALIAS='pr-key'
           echo KEY_PASSWORD='prkey123'
-          echo KEYSTORE_FILE='pr-key.jks'
+          echo "KEYSTORE_FILE=${KS_PATH}"
         } >> gradle.properties
 
     - name: Build release APK
