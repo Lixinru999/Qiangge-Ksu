@@ -21,7 +21,7 @@ import com.sevenk.core.ui.util.getRootShell
  */
 object StealthCodeStore {
 
-    private const val TAG = "7kkernel-stealth"
+    private const val TAG = "Qiangge-stealth"
 
     private const val DIR = "/data/adb/sevenk"
     private const val PATH = "$DIR/stealth_code"

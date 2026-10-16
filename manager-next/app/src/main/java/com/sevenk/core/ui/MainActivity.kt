@@ -61,7 +61,7 @@ import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 
-private const val TAG = "7kimisu"
+private const val TAG = "Qiangge"
 
 class MainActivity : ComponentActivity() {
 

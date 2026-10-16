@@ -187,7 +187,7 @@ private fun collectAndStorePreviousCrash(context: Context) {
                 // 🔴 v2.14：这不是 App 崩了 —— 是 ksud / 内核探测的**子进程**被系统
                 // （seccomp/SIGSYS 之类）拦下或杀掉。App 进程活得好好的。
                 // 以前这里会写 last_crash.txt 并弹「崩溃上报」，用户就以为"闪退"。
-                // 现在只留一行日志（真机上 `logcat -s 7kkernel` 能看到），不打扰用户。
+                // 现在只留一行日志（真机上 `logcat -s Qiangge` 能看到），不打扰用户。
                 Log.i(TAG, "崩溃上报:确认是内核探测子进程被系统拦下(非 App 崩溃),只记日志不上报")
                 return@runCatching
             }

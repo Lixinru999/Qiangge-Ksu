@@ -4,7 +4,7 @@
 #
 # 用法:  scripts/pack-source.sh <版本号> [输出目录]
 # 例:    scripts/pack-source.sh v0.13.55
-#        scripts/pack-source.sh v0.13.55 ~/projects/7kkernel/v0.13.55/源码
+#        scripts/pack-source.sh v0.13.55 ~/projects/Qiangge/v0.13.55/源码
 #
 # 特点:
 #   · 用 git 的文件清单打包 → 自动遵守 .gitignore(不会把 build/target 打进去),
@@ -15,9 +15,9 @@ set -euo pipefail
 
 VER="${1:?用法: $0 <版本号,例如 v0.13.55> [输出目录]}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-OUT="${2:-$HOME/projects/7kkernel/$VER/源码}"
+OUT="${2:-$HOME/projects/Qiangge/$VER/源码}"
 TMP="$(mktemp -d)"
-DIR="$TMP/7kimisu-$VER"
+DIR="$TMP/Qiangge-$VER"
 mkdir -p "$DIR"
 
 # 1) 复制"源码"文件(遵守 .gitignore)
@@ -31,11 +31,11 @@ mkdir -p "$DIR"
 
 # 2) 附源码说明
 cat > "$DIR/源码说明.txt" <<EOF
-7kimisu $VER —— 完整源码
+Qiangge $VER —— 完整源码
 =========================================================
 
 【这是什么】
-  7kimisu 是 KernelSU 的第三方修改版(非官方分支)。
+  Qiangge 是 KernelSU 的第三方修改版(非官方分支)。
   对外发布的是编译好的 APK —— 按上游采用的开源协议要求,这里提供与该 APK
   【完全对应】的完整源码,任何人都可以查看、修改、再分发。
 
@@ -50,14 +50,14 @@ cat > "$DIR/源码说明.txt" <<EOF
   感谢上游作者 weishu(tiann) 与所有社区贡献者开源。
 
 【对应版本】
-  7kimisu-$VER
-  与同目录发布的 7kimisu-$VER.apk 一一对应。
+  Qiangge-$VER
+  与同目录发布的 Qiangge-$VER.apk 一一对应。
 
 【怎么编译】
   1) 管理器 APK(Android SDK + JDK)
        cd manager
-       ./gradlew :app:assembleRelease -PPREBUILT_NATIVE=1 -PKSU_NAME=7kimisu \\
-         -PKSU_VERSION_NAME=7kimisu-$VER \\
+       ./gradlew :app:assembleRelease -PPREBUILT_NATIVE=1 -PKSU_NAME=Qiangge \\
+         -PKSU_VERSION_NAME=Qiangge-$VER \\
          -PKEYSTORE_FILE=<你的签名库> -PKEYSTORE_PASSWORD=*** -PKEY_ALIAS=*** -PKEY_PASSWORD=***
      注:仓库不含签名库;预编译 native 库(libksud.so 等)属构建产物,请用下面的 3) 自行编译,
         或自行放入 manager/app/src/main/jniLibs/。
@@ -86,7 +86,7 @@ EOF
 
 # 3) 打包
 mkdir -p "$OUT"
-rm -f "$OUT/7kimisu-$VER-src.tar.gz"
-tar -czf "$OUT/7kimisu-$VER-src.tar.gz" -C "$TMP" "7kimisu-$VER"
+rm -f "$OUT/Qiangge-$VER-src.tar.gz"
+tar -czf "$OUT/Qiangge-$VER-src.tar.gz" -C "$TMP" "Qiangge-$VER"
 rm -rf "$TMP"
-echo "✅ 源码包: $OUT/7kimisu-$VER-src.tar.gz  ($(du -h "$OUT/7kimisu-$VER-src.tar.gz" | cut -f1), $(tar -tzf "$OUT/7kimisu-$VER-src.tar.gz" | wc -l | tr -d ' ') 个条目)"
+echo "✅ 源码包: $OUT/Qiangge-$VER-src.tar.gz  ($(du -h "$OUT/Qiangge-$VER-src.tar.gz" | cut -f1), $(tar -tzf "$OUT/Qiangge-$VER-src.tar.gz" | wc -l | tr -d ' ') 个条目)"

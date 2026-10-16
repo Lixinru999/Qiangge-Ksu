@@ -56,7 +56,7 @@ fun getVersionCode(): Int {
     if (override != null && override > derived) return override
     if (override != null) {
         println(
-            "[7kimisu] 忽略 -PKSU_VERSION_CODE=$override：它不大于按版本名算出的 $derived。" +
+            "[Qiangge] 忽略 -PKSU_VERSION_CODE=$override：它不大于按版本名算出的 $derived。" +
                 "版本号变小会被 Android 当「降级」直接拒装（用户反馈过，见 manager/build.gradle.kts 注释）。"
         )
     }

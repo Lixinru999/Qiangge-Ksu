@@ -509,7 +509,7 @@ module_param_cb(ksu_debug_manager_appid, &expected_size_ops, &ksu_debug_manager_
 
 #endif
 
-// /data/app/XXXXX/<PACKAGE_NAME>-YYY/base.apk，从倒数第二段取包名（7kimisu 认主用）
+// /data/app/XXXXX/<PACKAGE_NAME>-YYY/base.apk，从倒数第二段取包名（Qiangge 认主用）
 int get_pkg_from_apk_path(char *pkg, const char *path)
 {
     int len = strlen(path);

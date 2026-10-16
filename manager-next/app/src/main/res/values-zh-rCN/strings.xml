@@ -22,7 +22,7 @@
     <string name="home_not_installed">未安装</string>
     <string name="home_click_to_install">点击安装</string>
     <string name="home_unsupported">不支持</string>
-    <string name="home_unsupported_reason">你的内核不受 7kimisu 支持</string>
+    <string name="home_unsupported_reason">你的内核不受 Qiangge 支持</string>
     <string name="home_can_install">可以安装了</string>
     <string name="home_can_install_summary">已拿到 root；点这里修补并安装</string>
     <string name="home_manager_not_recognized">内核未就绪</string>
@@ -125,12 +125,12 @@
     <string name="about_learn_kernelsu">了解 KernelSU</string>
     <string name="about_license_title">开源许可</string>
     <string name="about_license_summary">GPL-3.0（基于 KernelSU 二次开发）</string>
-    <string name="about_fork_note">7kimisu 是 KernelSU 的第三方修改版（非官方分支）。KernelSU 是、且永远是免费开源的软件。</string>
+    <string name="about_fork_note">Qiangge 是 KernelSU 的第三方修改版（非官方分支）。KernelSU 是、且永远是免费开源的软件。</string>
 
     <!-- 拨号密令 -->
     <string name="stealth_restore_not_enabled">隐身模式未开启</string>
     <string name="stealth_restore_disabled">已关闭隐身模式</string>
-    <string name="stealth_restore_foreign_kernel">内核不是 7kimisu（请重启，或卸载另一个 root 管理器）</string>
+    <string name="stealth_restore_foreign_kernel">内核不是 Qiangge（请重启，或卸载另一个 root 管理器）</string>
     <string name="stealth_restore_kernel_too_old">内核太旧，不支持隐身模式</string>
     <string name="stealth_restore_not_recognized">本 App 现在没被内核认主，请重启设备后再试</string>
 

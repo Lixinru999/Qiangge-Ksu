@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- v2.17~v2.19 曾帶"管理器"後綴；使用者 2026-09-22 要求改回，v2.20 起就是 `7kimisu`。 -->
-    <string name="app_name">7kimisu</string>
+    <!-- v2.17~v2.19 曾帶"管理器"後綴；使用者 2026-09-22 要求改回，v2.20 起就是 `Qiangge`。 -->
+    <string name="app_name">Qiangge</string>
     <string name="home">首頁</string>
     <string name="home_not_installed">尚未安裝</string>
     <string name="home_click_to_install">點選開始安裝</string>
@@ -9,7 +9,7 @@
     <string name="home_manager_not_recognized_title">核心未就緒</string>
     <string name="home_can_install">可以安裝了</string>
     <string name="home_can_install_summary">已拿到 root 權限 —— 點這裡安裝核心，裝完重新開機即可</string>
-    <string name="home_manager_not_recognized_detail">本應用還沒拿到 root 權限，所以裝不了核心。\n\n· 從別的 root 管理器（官方 KernelSU / APatch / 面具）轉過來：\n先在那邊給 7kimisu 授權 root，再回來點安裝。\n\n· 之前一直用得好好的，解除安裝重裝後才變成這樣：\n先重新開機一次；開機後還是這樣，就檢查是不是還裝了另一個 7kimisu 管理器（核心同一時間只認一個管理器），把多餘的那個解除安裝後再試。</string>
+    <string name="home_manager_not_recognized_detail">本應用還沒拿到 root 權限，所以裝不了核心。\n\n· 從別的 root 管理器（官方 KernelSU / APatch / 面具）轉過來：\n先在那邊給 Qiangge 授權 root，再回來點安裝。\n\n· 之前一直用得好好的，解除安裝重裝後才變成這樣：\n先重新開機一次；開機後還是這樣，就檢查是不是還裝了另一個 Qiangge 管理器（核心同一時間只認一個管理器），把多餘的那個解除安裝後再試。</string>
     <string name="home_working">已開始運作</string>
     <string name="home_working_version">版本：%s</string>
     <string name="home_lkm_update_available">有可用的內建 LKM 更新，點選更新</string>
@@ -202,12 +202,12 @@
     <string name="install_method_stale">目前選中的安裝方式已經不在清單裡了（介面狀態變過），請重新選擇一次安裝方式。</string>
 
 
-    <!-- 🟡4(v2.4)：撥號密令關隱身失敗時，四種狀態各說一句真話（核心不是 7kimisu ≠ 核心太舊） -->
+    <!-- 🟡4(v2.4)：撥號密令關隱身失敗時，四種狀態各說一句真話（核心不是 Qiangge ≠ 核心太舊） -->
     <string name="stealth_restore_disabled">已關閉隱身模式</string>
     <string name="stealth_restore_not_enabled">隱身模式未開啟</string>
-    <string name="stealth_restore_foreign_kernel">核心不是 7kimisu（目前的 root 由別的方案提供）：請重新啟動裝置，或解除安裝另一個 root 管理器後再試。</string>
+    <string name="stealth_restore_foreign_kernel">核心不是 Qiangge（目前的 root 由別的方案提供）：請重新啟動裝置，或解除安裝另一個 root 管理器後再試。</string>
     <string name="stealth_restore_kernel_too_old">核心太舊，不支援隱身模式</string>
-    <string name="stealth_restore_not_recognized">本 App 目前沒有被核心認主：請重新啟動裝置，或解除安裝另一個 7kimisu 管理器後再試。</string>
+    <string name="stealth_restore_not_recognized">本 App 目前沒有被核心認主：請重新啟動裝置，或解除安裝另一個 Qiangge 管理器後再試。</string>
 
     <!-- ══ 網頁管理器（v2.13：加了專屬連結鑑權）══ -->
     <string name="webadmin_title">網頁管理器</string>

@@ -9,7 +9,7 @@ import com.topjohnwu.superuser.Shell
 import java.io.File
 import kotlin.concurrent.thread
 
-private const val TAG = "7kimisu"
+private const val TAG = "Qiangge"
 
 lateinit var ksuApp: SevenkApplication
 

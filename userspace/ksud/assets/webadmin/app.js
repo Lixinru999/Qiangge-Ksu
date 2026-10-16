@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════
-   7kimisu 网页管理器 — 页面逻辑
+   Qiangge 网页管理器 — 页面逻辑
    ──────────────────────────────────────────────────────────────────
    安全约定（改这个文件时别破坏）：
      · 所有动态数据（模块名/说明/App 名…）一律用 textContent 写入，
@@ -146,7 +146,7 @@ function chipsRow(container, items, current, onPick) {
 /* ── 主题 ── */
 var THEMES = [
   { id: "auto",    name: "跟随系统",   sw: ["--bg", "--accent", "--ok"] },
-  { id: "7k",      name: "7kimisu",    sw: ["--bg", "--accent", "--ok"] },
+  { id: "7k",      name: "Qiangge",    sw: ["--bg", "--accent", "--ok"] },
   { id: "mocha",   name: "Catppuccin Mocha", sw: ["--bg", "--accent", "--ok"] },
   { id: "latte",   name: "Catppuccin Latte", sw: ["--bg", "--accent", "--ok"] },
   { id: "nord",    name: "Nord",       sw: ["--bg", "--accent", "--ok"] },
@@ -1228,7 +1228,7 @@ function renderAbout() {
   t1.appendChild(ic("info"));
   t1.appendChild(el("span", null, "关于"));
   c1.appendChild(t1);
-  c1.appendChild(row("package", "网页管理器", "7kimisu 内置"));
+  c1.appendChild(row("package", "网页管理器", "Qiangge 内置"));
   c1.appendChild(row("shield", "访问范围", "仅本机 127.0.0.1", true, "ok"));
   c1.appendChild(row("link", "访问鉴权", "专属链接（地址里带 256 位随机密钥）", true, "ok"));
   c1.appendChild(row("ban", "防爆破", "密钥 256 位随机，猜不出来", true, "ok"));
@@ -1429,7 +1429,7 @@ function initSprite() {
   window.addEventListener("message", function (ev) {
     if (ev.origin && location.origin && ev.origin !== location.origin) return;
     var d = ev.data;
-    if (!d || d.source !== "7kimisu-webui") return;
+    if (!d || d.source !== "Qiangge-webui") return;
     if (d.type === "toast") toast(String(d.message || ""));
     if (d.type === "exit") closeSheet();
   });

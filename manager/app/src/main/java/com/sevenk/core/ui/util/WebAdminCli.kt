@@ -31,7 +31,7 @@ import android.util.Log
  */
 object WebAdminCli {
 
-    private const val TAG = "7kkernel-webadmin"
+    private const val TAG = "Qiangge-webadmin"
 
     /**
      * 🔐 把输出里可能出现的**访问密钥**打码。
@@ -179,7 +179,7 @@ object WebAdminCli {
     fun copyUrl(context: android.content.Context, url: String): Boolean = runCatching {
         val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
                 as android.content.ClipboardManager
-        cm.setPrimaryClip(android.content.ClipData.newPlainText("7kimisu 网页管理器", url))
+        cm.setPrimaryClip(android.content.ClipData.newPlainText("Qiangge 网页管理器", url))
         true
     }.getOrDefault(false)
 }

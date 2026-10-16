@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════
-   7kimisu 模块网页桥
+   Qiangge 模块网页桥
    ──────────────────────────────────────────────────────────────────
    模块自带的 WebUI 是跑在本页面的 <iframe> 里的，它期望有一个 window.ksu
    对象（KernelSU 的 JS API，见仓库 js/index.js）。这个文件就是把它补上，
@@ -59,7 +59,7 @@
       if (xhr.status !== 200) return null;
       return JSON.parse(xhr.responseText);
     } catch (e) {
-      console.warn("[7kimisu] 同步 exec 失败: " + e);
+      console.warn("[Qiangge] 同步 exec 失败: " + e);
       return null;
     }
   }
@@ -112,7 +112,7 @@
     spawn: function (command, argsJson, optionsJson, callbackName) {
       var child = window[callbackName];
       if (!child) {
-        console.warn("[7kimisu] spawn 找不到回调对象 " + callbackName);
+        console.warn("[Qiangge] spawn 找不到回调对象 " + callbackName);
         return;
       }
       var args = [];
@@ -126,7 +126,7 @@
         child.stdin.__7kWrapped = true;
         child.stdin.emit = function (ev) {
           if (ev === "data" || ev === "end") {
-            console.warn("[7kimisu] 网页版不支持向子进程写 stdin（管理器 App 也不支持）—— 这次写入被忽略了");
+            console.warn("[Qiangge] 网页版不支持向子进程写 stdin（管理器 App 也不支持）—— 这次写入被忽略了");
             return;
           }
           return rawEmit.apply(null, arguments);
@@ -197,7 +197,7 @@
 
     /* 让父页面（网页管理器）弹提示 */
     toast: function (msg) {
-      parent.postMessage({ source: "7kimisu-webui", type: "toast", message: String(msg) }, "*");
+      parent.postMessage({ source: "Qiangge-webui", type: "toast", message: String(msg) }, "*");
     },
 
     fullScreen: function () { /* 浏览器里本来就是全屏，忽略 */ },
@@ -209,14 +209,14 @@
     },
 
     exit: function () {
-      parent.postMessage({ source: "7kimisu-webui", type: "exit" }, "*");
+      parent.postMessage({ source: "Qiangge-webui", type: "exit" }, "*");
     }
   };
 
   window.ksu = new Proxy(impl, {
     get: function (t, p) {
       if (p in t) return t[p];
-      console.warn("[7kimisu] 模块调用网页版没有的 ksu." + String(p));
+      console.warn("[Qiangge] 模块调用网页版没有的 ksu." + String(p));
       return function () { return ""; };
     }
   });

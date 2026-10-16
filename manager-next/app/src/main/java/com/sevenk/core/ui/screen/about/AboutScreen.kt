@@ -46,7 +46,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
-private const val REPO_URL = "https://github.com/hartgerinktarcila-design/7kimisu"
+private const val REPO_URL = "https://github.com/Lixinru999/Qiangge-Ksu"
 private const val KERNELSU_URL = "https://kernelsu.org"
 
 @Composable

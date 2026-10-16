@@ -23,20 +23,20 @@ val managerVersionCode = rootProject.extra["managerVersionCode"] as Int
 val managerVersionName = rootProject.extra["managerVersionName"] as String
 
 val isPrBuild = project.findProperty("IS_PR_BUILD")?.toString()?.toBoolean() ?: false
-val defaultManagerPackageName = if (isPrBuild) "com.sevenk.core.pr" else "com.sevenk.core"
-val defaultManagerName = if (isPrBuild) "KernelSU PR" else "7kimisu"
+val defaultManagerPackageName = if (isPrBuild) "com.qiangge.ksu.pr" else "com.qiangge.ksu"
+val defaultManagerName = if (isPrBuild) "KernelSU PR" else "Qiangge"
 val managerPackageName = project.findProperty("KSU_PACKAGE_NAME")?.toString() ?: defaultManagerPackageName
 val managerName = project.findProperty("KSU_NAME")?.toString() ?: defaultManagerName
 /**
- * 桌面/最近任务里显示的**应用名**（与 `managerName` 一致 = `7kimisu`）。
+ * 桌面/最近任务里显示的**应用名**（与 `managerName` 一致 = `Qiangge`）。
  *
- * 历史：v2.17 起曾写成「7kimisu 管理器」，目的是跟旧包 `com.sevenkimimasy.love` 区分
- * （旧包与新包用**同一个图标**）。但旧包本来也叫 `7kimisu`，加了"管理器"三个字粉丝
- * 照样分不清该点哪个；用户 2026-09-22 明确要求改回 `7kimisu`，**v2.20 照办**。
+ * 历史：v2.17 起曾写成「Qiangge 管理器」，目的是跟旧包 `com.sevenkimimasy.love` 区分
+ * （旧包与新包用**同一个图标**）。但旧包本来也叫 `Qiangge`，加了"管理器"三个字粉丝
+ * 照样分不清该点哪个；用户 2026-09-22 明确要求改回 `Qiangge`，**v2.20 照办**。
  *
- * ⚠️ 只影响 `app_name` 这个显示名：`managerName` 仍是 `KSU_NAME`（= "7kimisu"），
+ * ⚠️ 只影响 `app_name` 这个显示名：`managerName` 仍是 `KSU_NAME`（= "Qiangge"），
  *    APK 文件名（`base.archivesName`）与 `deploy.sh` 的产物核对**不受影响**。
- *    中文三种语言在 `res/values-zh-rCN|rHK|rTW/strings.xml` 里同样写 `7kimisu`。
+ *    中文三种语言在 `res/values-zh-rCN|rHK|rTW/strings.xml` 里同样写 `Qiangge`。
  */
 val managerLabel = "$managerName"
 

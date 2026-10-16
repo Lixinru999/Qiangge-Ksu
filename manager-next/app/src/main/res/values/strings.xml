@@ -22,7 +22,7 @@
     <string name="home_not_installed">Not installed</string>
     <string name="home_click_to_install">Tap to install</string>
     <string name="home_unsupported">Unsupported</string>
-    <string name="home_unsupported_reason">Your kernel is not supported by 7kimisu</string>
+    <string name="home_unsupported_reason">Your kernel is not supported by Qiangge</string>
     <string name="home_can_install">Ready to install</string>
     <string name="home_can_install_summary">Root is available; tap to patch and install</string>
     <string name="home_manager_not_recognized">Kernel not ready</string>
@@ -125,12 +125,12 @@
     <string name="about_learn_kernelsu">Learn KernelSU</string>
     <string name="about_license_title">Open source license</string>
     <string name="about_license_summary">GPL-3.0 (based on KernelSU)</string>
-    <string name="about_fork_note">7kimisu is a third-party fork of KernelSU (not affiliated with the official project). KernelSU is, and always will be, free and open source.</string>
+    <string name="about_fork_note">Qiangge is a third-party fork of KernelSU (not affiliated with the official project). KernelSU is, and always will be, free and open source.</string>
 
     <!-- Stealth receiver (dialer secret code) -->
     <string name="stealth_restore_not_enabled">Stealth mode is not enabled</string>
     <string name="stealth_restore_disabled">Stealth mode disabled</string>
-    <string name="stealth_restore_foreign_kernel">The kernel is not 7kimisu (reboot, or uninstall the other root manager)</string>
+    <string name="stealth_restore_foreign_kernel">The kernel is not Qiangge (reboot, or uninstall the other root manager)</string>
     <string name="stealth_restore_kernel_too_old">Kernel too old: stealth mode is not supported</string>
     <string name="stealth_restore_not_recognized">This app is not recognized by the kernel right now; reboot and try again</string>
 

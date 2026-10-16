@@ -89,7 +89,7 @@ fun CrashReportDialog() {
                 onClick = {
                     runCatching {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                        clipboard?.setPrimaryClip(ClipData.newPlainText("7kimisu-crash", text))
+                        clipboard?.setPrimaryClip(ClipData.newPlainText("Qiangge-crash", text))
                     }
                     runCatching {
                         Toast.makeText(context, "已复制，去粘贴发给我们即可", Toast.LENGTH_SHORT).show()

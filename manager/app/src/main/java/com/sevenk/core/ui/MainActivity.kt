@@ -221,7 +221,7 @@ class MainActivity : ComponentActivity() {
         com.sevenk.core.core.utils.AppExecutors.io.execute {
             runCatching {
                 val seeded = com.sevenk.core.ui.util.WallpaperStore.seedDefaultIfNeeded(this)
-                android.util.Log.i("7kkernel", "默认壁纸播种: $seeded")
+                android.util.Log.i("Qiangge", "默认壁纸播种: $seeded")
             }
         }
         // 内核 UAPI >= 管理器即可安装 ksud(新内核向后兼容旧管理器)
@@ -312,7 +312,7 @@ class MainActivity : ComponentActivity() {
                 com.sevenk.core.data.repository.SettingsRepositoryImpl().flatHome
             }
 
-            // ⚠️ v2.20：「检测到旧版 7kimisu」那套**整套已删除**（用户要求：退回上游做法）。
+            // ⚠️ v2.20：「检测到旧版 Qiangge」那套**整套已删除**（用户要求：退回上游做法）。
             //    启动弹窗、设置页那一行、首页常驻卡全部撤掉；检测/卸载相关的代码文件也已
             //    从仓库里删干净，不再有任何入口。
             //
@@ -573,7 +573,7 @@ class MainActivity : ComponentActivity() {
         const val STEALTH_STATE_UNKNOWN = -2
 
         /** 隐身相关日志统一用这个 tag（与 StealthReceiver 一致） */
-        const val TAG = "7kkernel-stealth"
+        const val TAG = "Qiangge-stealth"
     }
 
 }

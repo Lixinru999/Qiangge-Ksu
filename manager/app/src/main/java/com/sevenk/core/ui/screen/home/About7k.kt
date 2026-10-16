@@ -1,7 +1,7 @@
 package com.sevenk.core.ui.screen.home
 
 /**
- * 「关于 7kimisu」说明文案(Markdown)。
+ * 「关于 Qiangge」说明文案(Markdown)。
  * Miuix 与 Material 两套首页共用,避免两处不一致。
  */
 /**
@@ -11,7 +11,7 @@ package com.sevenk.core.ui.screen.home
  *    用来判断"是不是出了新公告"。改标题或改正文都会让指纹变 ⇒ 老用户会再看到一次公告，
  *    所以改文案之前先想一下：这是"真出了新公告"还是只是想改个错别字?
  */
-internal const val ANNOUNCEMENT_TITLE = "7kimisu 是免费开源的"
+internal const val ANNOUNCEMENT_TITLE = "Qiangge 是免费开源的"
 
 /**
  * 开屏公告的正文。
@@ -21,7 +21,7 @@ internal const val ANNOUNCEMENT_TITLE = "7kimisu 是免费开源的"
  *    判据全在 `ui/util/AnnouncementPrefs.kt`，这里只放文案。
  */
 internal val ANNOUNCEMENT_TEXT = """
-### 7kimisu 是免费开源软件
+### Qiangge 是免费开源软件
 
 - 本项目是 **KernelSU 的第三方修改版**(非官方分支),遵循上游的开源协议,**源码公开可获取**。
 - 它 **完全免费**:没有付费版、没有会员、没有卡密、没有激活码,也不卖任何东西。
@@ -30,13 +30,13 @@ internal val ANNOUNCEMENT_TEXT = """
 
 ### 更新 / 公告 / 下载
 
-- **TG 频道:sevenkimimasy** —— https://t.me/sevenkimimasy
+- **GitHub 仓库:Lixinru999/Qiangge-Ksu** —— https://github.com/Lixinru999/Qiangge-Ksu
 - 新版本、修复、公告和最新下载直链都发在这里,拿不准就去频道看一眼。
 
 ### 致谢
 
 由衷感谢 **KernelSU** 及其作者 **weishu(tiann)** 和所有社区贡献者把项目开源 ——
-没有上游的开源,就没有 7kimisu 这个二改版。
+没有上游的开源,就没有 Qiangge 这个二改版。
 
 - 上游项目:KernelSU(https://github.com/tiann/KernelSU)
 
@@ -44,7 +44,7 @@ internal val ANNOUNCEMENT_TEXT = """
 
 - 刷机有风险,操作前请先备份;因使用本软件造成的任何后果请自负。
 - 别拿它去做坏事,别拿去卖钱;看到倒卖的,顺手举报一下就好。
-- **源码**:遵循上游开源协议,**源码可向作者索取** —— 来 TG 频道 **sevenkimimasy** 找我要。
+- **源码**:遵循上游开源协议,**源码可向作者索取** —— 来 GitHub 仓库 **Lixinru999/Qiangge-Ksu** 找我要。
   (本项目只在此频道发布,没有把源码放到公开下载目录。)
 
 **玩得开心 ~**
@@ -55,7 +55,7 @@ internal const val STATUS_CARD_TEXT = "希望以后你能开心"
 internal val ABOUT_7K_TEXT = """
 ### 这是什么
 
-**7kimisu** 是一款基于 KernelSU 的第三方管理器(非官方分支),在 KernelSU 的基础上做了二次修改。
+**Qiangge** 是一款基于 KernelSU 的第三方管理器(非官方分支),在 KernelSU 的基础上做了二次修改。
 
 内核侧改了信任机制:内核在编译期写死了签名,**只信任本管理器** —— 换成官方 KernelSU 管理器反而拿不到 root。
 界面侧加了一些 KernelSU 原本没有的功能,见下。
@@ -72,7 +72,7 @@ internal val ABOUT_7K_TEXT = """
 
 ### 获取更新
 
-- **TG 频道:sevenkimimasy** —— https://t.me/sevenkimimasy
+- **GitHub 仓库:Lixinru999/Qiangge-Ksu** —— https://github.com/Lixinru999/Qiangge-Ksu
 - 新版本、修复、公告都发在这里。官方的「检查更新」已关闭,想看新版就来频道。
 
 ### 版本怎么配

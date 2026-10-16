@@ -93,9 +93,9 @@ object Stealth {
         runCatching { Natives.kernelUAPIVersion >= UAPI_WITH_STEALTH }.getOrDefault(false)
 
     /**
-     * 内核到底**是不是 7kimisu 的**（不看功能新旧）—— 只看"内核认不认这个 App 当管理器"。
+     * 内核到底**是不是 Qiangge 的**（不看功能新旧）—— 只看"内核认不认这个 App 当管理器"。
      *
-     * 拿不准（JNI 没加载 / ioctl 失败）一律按 false —— 宁可说"内核不是 7kimisu
+     * 拿不准（JNI 没加载 / ioctl 失败）一律按 false —— 宁可说"内核不是 Qiangge
      * （请重启或卸载另一个管理器）"，那也是安全且正确的下一步。
      */
     fun kernelLooksOurs(): Boolean = runCatching { Natives.isManager }.getOrDefault(false)
@@ -113,9 +113,9 @@ object Stealth {
         val action = if (enabled) "开启" else "关闭"
         return when {
             kernelHasStealthFeature() ->
-                "${action}隐身失败:本 App 现在没被内核认主。请重启设备,或卸载另一个 7kimisu 管理器后再试"
+                "${action}隐身失败:本 App 现在没被内核认主。请重启设备,或卸载另一个 Qiangge 管理器后再试"
             kernelLooksOurs() -> "内核太旧,不支持隐身模式"
-            else -> "内核不是 7kimisu(当前 root 由别的方案提供):请重启设备,或卸载另一个 root 管理器后再试"
+            else -> "内核不是 Qiangge(当前 root 由别的方案提供):请重启设备,或卸载另一个 root 管理器后再试"
         }
     }
 

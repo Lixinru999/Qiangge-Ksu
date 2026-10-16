@@ -31,7 +31,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.sevenk.core.data.repository.SettingsRepositoryImpl
 
-private const val TAG = "7kkernel-wallpaper"
+private const val TAG = "Qiangge-wallpaper"
 
 /**
  * v2.8:壁纸"粘住"用的缓存槽 —— 记住**上一次真的画出"用户自己那份"**的结果

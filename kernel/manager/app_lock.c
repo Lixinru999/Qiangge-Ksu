@@ -7,7 +7,7 @@
  * 但内核不再生成/校验任何密钥:锁永远是"未配置 + 已解锁"状态,
  * 因此 only_manager_authed() 等权限检查不会再拦截管理器。
  *
- * 之前写入的 /data/adb/sevenk/applock.hash 与 /sdcard/Download/7kkernel_key.txt
+ * 之前写入的 /data/adb/sevenk/applock.hash 与 /sdcard/Download/Qiangge_key.txt
  * 会被忽略(不再读取),可以手动删除。
  */
 #include <linux/types.h>

@@ -106,10 +106,10 @@ object Stealth {
         runCatching { Natives.kernelUAPIVersion >= UAPI_WITH_STEALTH }.getOrDefault(false)
 
     /**
-     * 内核到底**是不是 7kimisu 的**（不看功能新旧）—— 只看"内核认不认这个 App 当管理器"。
+     * 内核到底**是不是 Qiangge 的**（不看功能新旧）—— 只看"内核认不认这个 App 当管理器"。
      *
      * 🟡4（v2.4）用途：拨号密令关隐身失败时，把两种失败原因分开说：
-     *   · [kernelHasStealthFeature] 为 false **且**本函数为 false → 内核**不是 7kimisu 的**
+     *   · [kernelHasStealthFeature] 为 false **且**本函数为 false → 内核**不是 Qiangge 的**
      *     （官方 KernelSU / 别的 root 方案）。以前这里一律说成「内核太旧」，是**误导**；
      *   · [kernelHasStealthFeature] 为 false 但本函数为 true → 内核是我们的，只是**太旧**。
      *
@@ -117,7 +117,7 @@ object Stealth {
      *   隐身功能本身就是 UAPI 5 才有的；能走到"没有隐身功能"这条分支，说明内核
      *   **报不出 UAPI 5**，也就不可能正开着隐身，于是内核不会去隐藏 MANAGER 标志。
      *
-     * 拿不准（JNI 没加载 / ioctl 失败）一律按 false —— 宁可说"内核不是 7kimisu
+     * 拿不准（JNI 没加载 / ioctl 失败）一律按 false —— 宁可说"内核不是 Qiangge
      * （请重启或卸载另一个管理器）"，那也是安全且正确的下一步。
      */
     fun kernelLooksOurs(): Boolean = runCatching { Natives.isManager }.getOrDefault(false)
@@ -138,12 +138,12 @@ object Stealth {
         if (setEnabled(enabled)) return null
         val action = if (enabled) "开启" else "关闭"
         // 🟡4（v2.4）：与拨号密令那边**同一套四态判据** ——
-        // 「内核不是 7kimisu」和「内核是我们的但太旧」以前会被混成同一句"内核太旧"。
+        // 「内核不是 Qiangge」和「内核是我们的但太旧」以前会被混成同一句"内核太旧"。
         return when {
             kernelHasStealthFeature() ->
-                "${action}隐身失败:本 App 现在没被内核认主。请重启设备,或卸载另一个 7kimisu 管理器后再试"
+                "${action}隐身失败:本 App 现在没被内核认主。请重启设备,或卸载另一个 Qiangge 管理器后再试"
             kernelLooksOurs() -> "内核太旧,不支持隐身模式"
-            else -> "内核不是 7kimisu(当前 root 由别的方案提供):请重启设备,或卸载另一个 root 管理器后再试"
+            else -> "内核不是 Qiangge(当前 root 由别的方案提供):请重启设备,或卸载另一个 root 管理器后再试"
         }
     }
 
@@ -177,7 +177,7 @@ object Stealth {
  *   「我指的是背景图片、动画公告这些,这些都是一个**没有 root 的用户**点进来才有的界面」
  * —— 隐身时要等于「一个没有 root 的用户打开这个 App」的**完整体验**:
  *     · 没有 root 的人也看得到 → 壁纸 / 透明度 / 动画 / 字体 / 扁平化 / 主题配色、公告弹窗、
- *       「关于 7kimisu / 支持开发 / 了解 KernelSU」三张卡、点「内核未就绪」弹出的原说明;
+ *       「关于 Qiangge / 支持开发 / 了解 KernelSU」三张卡、点「内核未就绪」弹出的原说明;
  *     · 只有有 root 的人才看得到 → 安装页里的「直接安装(推荐)」「安装到未使用槽位」。
  *
  * 所以"素颜"是**做反了**:个性化和 root 无关,一个没 root 的用户照样有壁纸、有动画。

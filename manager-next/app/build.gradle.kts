@@ -21,8 +21,8 @@ val managerVersionName = rootProject.extra["managerVersionName"] as String
 
 val isPrBuild = project.findProperty("IS_PR_BUILD")?.toString()?.toBoolean() ?: false
 val managerPackageName = project.findProperty("KSU_PACKAGE_NAME")?.toString()
-    ?: (if (isPrBuild) "com.sevenk.core.pr" else "com.sevenk.core")
-val managerName = project.findProperty("KSU_NAME")?.toString() ?: "7kimisu"
+    ?: (if (isPrBuild) "com.qiangge.ksu.pr" else "com.qiangge.ksu")
+val managerName = project.findProperty("KSU_NAME")?.toString() ?: "Qiangge"
 
 apksign {
     storeFileProperty = "KEYSTORE_FILE"
@@ -135,7 +135,7 @@ android {
 }
 
 base {
-    archivesName.set("7kimisu-next_${managerVersionName}_${managerVersionCode}")
+    archivesName.set("Qiangge-next_${managerVersionName}_${managerVersionCode}")
 }
 
 dependencies {

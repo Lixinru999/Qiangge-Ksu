@@ -158,7 +158,7 @@ class StealthReceiver : BroadcastReceiver() {
             // 四种情况说四句真话:
             //   ① 明确读到关着     → 「隐身模式未开启」
             //   ② 关成功           → 「已关闭隐身模式」
-            //   ③ 内核不是我们的   → 「内核不是 7kimisu(请重启或卸载另一个管理器)」
+            //   ③ 内核不是我们的   → 「内核不是 Qiangge(请重启或卸载另一个管理器)」
             //   ④ 内核是我们的、但太旧 → 「内核太旧,不支持隐身模式」
             //   ⑤ 内核是我们的、功能也在、但本 App 没被认主 → 让用户重启/卸载另一个管理器
             message = when {
@@ -256,7 +256,7 @@ class StealthReceiver : BroadcastReceiver() {
 
     companion object {
         const val DEFAULT_SECRET_CODE = "70707"
-        private const val TAG = "7kkernel-stealth"
+        private const val TAG = "Qiangge-stealth"
 
         /** 「关闭隐身」辅助通知的渠道 id / 渠道名 */
         private const val CHANNEL_ID = "stealth_restore"

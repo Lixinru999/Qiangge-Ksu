@@ -16,7 +16,7 @@ import com.sevenk.core.ui.component.WarningLevel
  * [com.sevenk.core.ui.component.miuix.WarningCard] 语义一一对应。
  *
  * 历史：这张卡原来**私藏在** `ui/screen/home/HomeMaterial.kt` 里，只有首页能用。
- * v2.2 的 D6 需要在**安装页**也放一张（"检测到当前 root 不是 7kimisu 的内核"），
+ * v2.2 的 D6 需要在**安装页**也放一张（"检测到当前 root 不是 Qiangge 的内核"），
  * 于是把它提出来放到公共位置，首页改成 import 这一份 —— 保持**全仓只有一份实现**。
  *
  * ⚠️ 底色必须来自主题的 `errorContainer` / `tertiaryContainer`：

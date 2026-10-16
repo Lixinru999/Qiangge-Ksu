@@ -126,9 +126,9 @@ fun HomePagerMiuix(
     // 「界面扁平化」(flat_home):开启后首页卡片不画底色,只留文字和图标。
     // 由 MainActivity 统一提供(顶栏/底栏也读它),这里直接取即可。
     val flatHome = com.sevenk.core.ui.theme.LocalFlatUi.current
-    // 「旧版 7kimisu」提示卡要用它拉起系统卸载界面(v2.2)
+    // 「旧版 Qiangge」提示卡要用它拉起系统卸载界面(v2.2)
     val context = LocalContext.current
-    // ⚠️ v0.13.157:这里原来有个 `stealthOn`(隐身时藏「关于 7kimisu」/「支持开发·了解 KernelSU」
+    // ⚠️ v0.13.157:这里原来有个 `stealthOn`(隐身时藏「关于 Qiangge」/「支持开发·了解 KernelSU」
     //    两张卡),**已删除**。用户判据:这两张卡是"一个**没有 root 的用户**点进来"就会看到的
     //    东西,隐身必须照常显示 —— 隐身只改"显示什么内容"(比如安装页里需要 root 的两个方法),
     //    不该把没 root 的人也看得到的卡片藏掉。
@@ -255,7 +255,7 @@ fun HomePagerMiuix(
                             flat = flatHome,
                         )
                         // ⚠️ v0.13.157:这两张卡**隐身时照常显示**(原来外面套着 `if (!stealthOn)`,已撤)。
-                        //    它们明写「7kimisu / 第三方 KernelSU 分支」和
+                        //    它们明写「Qiangge / 第三方 KernelSU 分支」和
                         //    「KernelSU is, and always will be, free and open source」——
                         //    但这正是"一个没 root 的用户"点进来会看到的东西,所以不该藏
                         //    (开屏公告同理,见 AnnouncementPopup)。
@@ -747,19 +747,19 @@ private fun About7kCard(
     val dialog = rememberConfirmDialog()
     HomeCard(flat = flat, modifier = modifier) {
         ArrowPreference(
-            title = "关于 7kimisu",
+            title = "关于 Qiangge",
             summary = "第三方 KernelSU 分支 · 点这里看说明",
             startAction = {
                 Icon(
                     imageVector = Icons.Rounded.Info,
-                    contentDescription = "关于 7kimisu",
+                    contentDescription = "关于 Qiangge",
                     modifier = Modifier.padding(end = 6.dp),
                     tint = colorScheme.onBackground,
                 )
             },
             onClick = {
                 dialog.showConfirm(
-                    title = "关于 7kimisu",
+                    title = "关于 Qiangge",
                     content = ABOUT_7K_TEXT,
                     markdown = true,
                     confirm = "知道了",

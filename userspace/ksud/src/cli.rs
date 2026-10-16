@@ -249,7 +249,7 @@ enum BootInfo {
     /// `ours` | `compatible` | `foreign` | `stock` (or `unknown` when it cannot be read).
     ///
     /// READ-ONLY: never writes to any partition. `compatible` means the image was patched by
-    /// official KernelSU (or 7kimisu <= v0.13.151) and a direct install is safe.
+    /// official KernelSU (or Qiangge <= v0.13.151) and a direct install is safe.
     RamdiskState {
         /// boot image path; default: the auto-detected boot partition of this device
         #[arg(short, long, default_value = None)]

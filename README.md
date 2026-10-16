@@ -1,4 +1,4 @@
-# 7kimisu
+# Qiangge
 
 **KernelSU 的第三方修改版**(非官方分支),管理器界面做了较多二次改造。
 
@@ -13,8 +13,9 @@
 
 ## 📥 下载
 
-- APK 与各版本对应的源码包:见发布频道(管理器「关于」页内有入口)
-- 源码同时在本仓库维护,每个发布版本会打 tag
+- 源码与本项目维护地址: https://github.com/Lixinru999/Qiangge-Ksu
+- APK 与各版本对应的源码包:见该仓库 Releases(管理器「关于」页内有入口)
+- 每个发布版本会打 tag
 
 ## 🔧 相对上游的主要改动
 
@@ -33,8 +34,8 @@
 ```bash
 # 1) 管理器 APK(需要 Android SDK + JDK)
 cd manager
-./gradlew :app:assembleRelease -PPREBUILT_NATIVE=1 -PKSU_NAME=7kimisu \
-  -PKSU_VERSION_CODE=32649 -PKSU_VERSION_NAME=7kimisu-vX.Y.Z \
+./gradlew :app:assembleRelease -PPREBUILT_NATIVE=1 -PKSU_NAME=Qiangge \
+  -PKSU_VERSION_CODE=32649 -PKSU_VERSION_NAME=Qiangge-vX.Y.Z \
   -PKEYSTORE_FILE=<签名库> -PKEYSTORE_PASSWORD=*** -PKEY_ALIAS=*** -PKEY_PASSWORD=***
 
 # 2) ksud(需要 Android NDK)
@@ -49,7 +50,14 @@ bash scripts/pack-source.sh vX.Y.Z
 ## 🙏 上游与致谢
 
 本项目基于 [**KernelSU**](https://github.com/tiann/KernelSU) 二次开发。
-感谢作者 **weishu(tiann)** 与所有社区贡献者把项目开源 —— 没有上游,就没有 7kimisu。
+感谢作者 **weishu(tiann)** 与所有社区贡献者把项目开源 —— 没有上游,就没有 Qiangge。
+
+## 👤 作者与版权
+
+- 维护者:**强哥**
+- 本项目(二次修改部分)版权归 **强哥** 所有 —— Copyright (C) 2026 强哥
+- 基于 [KernelSU](https://github.com/tiann/KernelSU) 二次开发;上游 KernelSU 的版权与许可
+  归其原作者及贡献者所有(GPL-2.0 / GPL-3.0),已按协议予以保留
 
 ## ⚠️ 免责
 

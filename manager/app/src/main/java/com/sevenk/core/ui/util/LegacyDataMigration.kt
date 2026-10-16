@@ -72,7 +72,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 object LegacyDataMigration {
 
-    private const val TAG = "7kkernel-migrate"
+    private const val TAG = "Qiangge-migrate"
 
     /** 旧数据目录（改名前的名字）。**故意保留**：迁移必须知道旧目录叫什么。 */
     private const val LEGACY_DIR = "/data/adb/ksu"

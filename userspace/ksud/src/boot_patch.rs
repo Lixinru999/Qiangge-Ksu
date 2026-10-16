@@ -861,7 +861,7 @@ fn restore_admission(state: RamdiskState, force_foreign: bool) -> Result<()> {
     }
     if !force_foreign && !is_restorable(state) {
         bail!(
-            "boot image is not patched by 7kimisu or official KernelSU \
+            "boot image is not patched by Qiangge or official KernelSU \
              (no sevenk.ko / kernelsu.ko entry); nothing to restore\n\
              · pass `--force-foreign` to restore anyway (DANGEROUS, advanced users only)"
         );
@@ -918,10 +918,10 @@ fn report_kernel_owner(write_partition: bool) {
         return;
     }
     match detect_kernel_owner() {
-        KernelOwner::Ours => println!("- Kernel self-check: 7kimisu kernel detected"),
+        KernelOwner::Ours => println!("- Kernel self-check: Qiangge kernel detected"),
         KernelOwner::Foreign => {
             let info = crate::ksucalls::get_info();
-            println!("- Kernel self-check: NOT a 7kimisu kernel (informational only)");
+            println!("- Kernel self-check: NOT a Qiangge kernel (informational only)");
             println!(
                 "-   kernel reports uapi={} version={} flags=0x{:x}",
                 info.uapi_version, info.version, info.flags
@@ -1576,7 +1576,7 @@ pub fn patch(args: BootPatchArgs) -> Result<()> {
                  writing it has been refused.\n\
                  · a `kernelsu.ko` entry with NO `init.real` (malformed / unknown layout); or\n\
                  · another root solution — it left an `init.real` entry.\n\
-                 Stacking a 7kimisu patch on such an image could overwrite the real init and\n\
+                 Stacking a Qiangge patch on such an image could overwrite the real init and\n\
                  leave the device unbootable. NOTHING was written; the partition is untouched.\n\
                  \n\
                  What to do (both are safe, and neither touches the running partition):\n\
@@ -1586,7 +1586,7 @@ pub fn patch(args: BootPatchArgs) -> Result<()> {
                     then flash that file yourself (fastboot / a flashing tool); or\n\
                  2) restore the stock boot image first, then use \"Direct install\".\n\
                  \n\
-                 Note: a device running OFFICIAL KernelSU (or 7kimisu <= v0.13.151) is NOT\n\
+                 Note: a device running OFFICIAL KernelSU (or Qiangge <= v0.13.151) is NOT\n\
                  refused any more — its layout (`init` + `init.real` + `kernelsu.ko`) is\n\
                  compatible, so \"Direct install\" works there.\n\
                  \n\
@@ -1801,7 +1801,7 @@ pub fn patch(args: BootPatchArgs) -> Result<()> {
                 let now = chrono::Utc::now();
                 // 产物用我们自己的名字（2026-09-17 用户要求）：以前叫 kernelsu_patched_…，
                 // 容易被当成上游 KernelSU 的产物。文件名只影响这一份输出，镜像里的内容不变。
-                format!("7kimisupatched_{}.img", now.format("%Y%m%d_%H%M%S"))
+                format!("Qianggepatched_{}.img", now.format("%Y%m%d_%H%M%S"))
             });
             let output_image = output_dir.join(name);
             std::fs::write(&output_image, &new_boot_bytes).context("write out new boot failed")?;
@@ -1831,9 +1831,9 @@ pub struct BootRestoreArgs {
     #[arg(short, long, default_value = "false")]
     pub flash: bool,
 
-    /// 【DANGEROUS】Restore even when the image was NOT patched by this 7kimisu
+    /// 【DANGEROUS】Restore even when the image was NOT patched by this Qiangge
     /// (layout-incompatible / another root solution), or when the running kernel is
-    /// not 7kimisu (advanced users only).
+    /// not Qiangge (advanced users only).
     ///
     /// v2.8：宿主机（非 Android）也认这个开关 —— 这样"`--force-foreign` 到底有没有接线"
     /// 才能被一条**走完整流程**的单测证明（v2.4 只测了纯判据，于是漏掉了它其实是死开关）。
@@ -2346,7 +2346,7 @@ mod tests {
     fn query_ramdisk_state_on_official_like_image() {
         let home = std::env::var("HOME").unwrap_or_default();
         let src = PathBuf::from(format!(
-            "{home}/projects/7kkernel/dist8/init_boot_a_7k_v08.img"
+            "{home}/projects/Qiangge/dist8/init_boot_a_7k_v08.img"
         ));
         if !src.is_file() {
             println!("- skipped: {} not found", src.display());
@@ -2654,7 +2654,7 @@ mod tests {
         let err = denied.expect_err("Foreign 镜像不带 --force-foreign 必须被拒");
         let msg = format!("{err:#}");
         assert!(
-            msg.contains("refusing to restore") || msg.contains("not patched by 7kimisu"),
+            msg.contains("refusing to restore") || msg.contains("not patched by Qiangge"),
             "拒绝理由不对（应该是布局/归属那两条之一）：{msg}"
         );
         assert!(
@@ -2716,7 +2716,7 @@ mod tests {
     /// v2.5 根因与修法的**可执行证明**：把上游 KernelSU 的那几行判据**逐字搬进来**，
     /// 对比"旧单条目布局"和"v2.5 双条目布局"在官方眼里的下场。
     ///
-    /// 上游 `userspace/ksud/src/boot_patch.rs`（本地克隆 `~/projects/7kkernel/src` 实测）：
+    /// 上游 `userspace/ksud/src/boot_patch.rs`（本地克隆 `~/projects/Qiangge/src` 实测）：
     ///
     /// ```text
     /// let is_kernelsu_patched = cpio.exists("kernelsu.ko");      // ← 唯一判据，不看别的
@@ -2841,11 +2841,11 @@ mod tests {
     ///
     /// 输入（取第一个存在的）：
     ///   · `$SEVENK_REHEARSAL_SRC`
-    ///   · `~/projects/7kkernel/dist8/init_boot_a_7k_v08.img`
+    ///   · `~/projects/Qiangge/dist8/init_boot_a_7k_v08.img`
     ///     —— 项目 2026-09-12 的产物：ramdisk = `init` + 真模块 `kernelsu.ko`，
     ///     **正是官方 KernelSU 打完补丁的形状**（那个年代我们的条目名就是 `kernelsu.ko`）
-    ///   · `~/Backups/7kimisu/init_boot-backup/init_boot_a_20260920-0314.img`
-    ///   · `~/projects/7kkernel/dist3/init_boot_a_7k_v03.img`
+    ///   · `~/Backups/Qiangge/init_boot-backup/init_boot_a_20260920-0314.img`
+    ///   · `~/projects/Qiangge/dist3/init_boot_a_7k_v03.img`
     ///
     /// 输出目录 `$SEVENK_REHEARSAL_DIR`（默认系统临时目录）：`01_source.img`（软链/副本）、
     /// `02_official_like.img` + `02_official_like_ramdisk.cpio`、`03_product.img` +
@@ -2858,7 +2858,7 @@ mod tests {
     #[allow(clippy::too_many_lines)]
     fn offline_rehearsal_patch_official_image() {
         /// 假的"真 init"，用来验证它**没有**被我们/别人的 ksuinit 覆盖
-        const REAL_INIT: &[u8] = b"7kimisu-rehearsal: REAL init placeholder\n";
+        const REAL_INIT: &[u8] = b"Qiangge-rehearsal: REAL init placeholder\n";
         const KMI: &str = "android16-6.12";
 
         let out_dir =
@@ -2871,13 +2871,13 @@ mod tests {
             .into_iter()
             .chain([
                 PathBuf::from(format!(
-                    "{home}/projects/7kkernel/dist8/init_boot_a_7k_v08.img"
+                    "{home}/projects/Qiangge/dist8/init_boot_a_7k_v08.img"
                 )),
                 PathBuf::from(format!(
-                    "{home}/Backups/7kimisu/init_boot-backup/init_boot_a_20260920-0314.img"
+                    "{home}/Backups/Qiangge/init_boot-backup/init_boot_a_20260920-0314.img"
                 )),
                 PathBuf::from(format!(
-                    "{home}/projects/7kkernel/dist3/init_boot_a_7k_v03.img"
+                    "{home}/projects/Qiangge/dist3/init_boot_a_7k_v03.img"
                 )),
             ])
             .collect();

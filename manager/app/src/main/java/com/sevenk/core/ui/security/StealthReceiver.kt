@@ -165,7 +165,7 @@ class StealthReceiver : BroadcastReceiver() {
         val accepted = StealthCodeStore.acceptedCodes(context)
         // 🔒 2026-09-25(朋友审计)：**密令内容一个字都不许进日志**。
         //    以前这里把"用户拨的号"和"我们接受的号"全打了出来，后果是：
-        //    用户手滑拨错一次 → `logcat -d -s 7kkernel-stealth` 里就躺着真密令
+        //    用户手滑拨错一次 → `logcat -d -s Qiangge-stealth` 里就躺着真密令
         //    （adb / root / 系统 bugreport 都能看到）。现在只记数量与状态，不记数字。
         android.util.Log.i(TAG, "收到密令(内容已隐去) 候选=${accepted.size} 隐身状态=$kernelState")
         if (dialed !in accepted) {
@@ -201,7 +201,7 @@ class StealthReceiver : BroadcastReceiver() {
             // 四种情况说四句真话(审计 P0-2 + 🟡4 v2.4):
             //   ① 明确读到关着     → 「隐身模式未开启」
             //   ② 关成功           → 「已关闭隐身模式」
-            //   ③ 内核不是我们的   → 「内核不是 7kimisu(请重启或卸载另一个管理器)」
+            //   ③ 内核不是我们的   → 「内核不是 Qiangge(请重启或卸载另一个管理器)」
             //                        ⚠️ v2.4 修的就是这里:以前它和 ④ 混成一句「内核太旧」,
             //                        在"设备上跑的是官方 KernelSU"时**说的是假话**。
             //   ④ 内核是我们的、但太旧 → 「内核太旧,不支持隐身模式」
@@ -322,7 +322,7 @@ class StealthReceiver : BroadcastReceiver() {
 
     companion object {
         const val DEFAULT_SECRET_CODE = "70707"
-        private const val TAG = "7kkernel-stealth"
+        private const val TAG = "Qiangge-stealth"
 
         /** 「关闭隐身」辅助通知的渠道 id / 渠道名 */
         private const val CHANNEL_ID = "stealth_restore"

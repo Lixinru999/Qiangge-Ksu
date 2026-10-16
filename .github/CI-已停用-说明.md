@@ -3,7 +3,7 @@
 本目录里的工作流文件（以及同级的 `dependabot.yml.disabled`）**来自上游 KernelSU**，
 原本用于上游项目的自动构建与检查。
 
-本仓库是 **7kimisu 的源码分发仓库**：只用来公开发布与 `7kimisu-vX.Y.apk` 对应的源码，
+本仓库是 **Qiangge 的源码分发仓库**：只用来公开发布与 `Qiangge-vX.Y.apk` 对应的源码，
 **不需要也不运行任何 CI**。因此：
 
 - `.github/workflows/` → 改名为 **`.github/workflows-disabled/`**（GitHub 只会读取 `workflows/`，

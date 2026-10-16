@@ -77,7 +77,7 @@ private const val TAG = "Downloader"
 private const val DOWNLOAD_TIMEOUT_MS = 10L * 60 * 1000
 
 /*
- * 这是第三方分支(7kimisu),内核签名是自定义的:官方 KernelSU 的管理器装上来
+ * 这是第三方分支(Qiangge),内核签名是自定义的:官方 KernelSU 的管理器装上来
  * 【拿不到 root】,版本号也不通用。所以不做官方更新检查 —— 否则会一直提示
  * "有新版本",装了反而废掉。以后有了自己的发布地址,填上 UPDATE_CHECK_URL 即可。
  */

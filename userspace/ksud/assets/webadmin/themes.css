@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════
-   7kimisu 网页管理器 — 配色（主题）
+   Qiangge 网页管理器 — 配色（主题）
    ──────────────────────────────────────────────────────────────────
    每个主题只是给下面这组 CSS 变量换一套值，组件样式一律不写死颜色。
 
@@ -7,14 +7,14 @@
      · Catppuccin  Mocha / Latte  —— MIT  © 2021 Catppuccin
      · Nord                        —— MIT  © 2016-present Sven Greb
      · Dracula（+ Alucard 浅色）   —— MIT  © 2023 Dracula Theme
-   7kimisu 深色 / 浅色 为本项目自有配色。
+   Qiangge 深色 / 浅色 为本项目自有配色。
 
    用法：<html data-theme="mocha" data-scheme="dark">
         data-theme: auto | 7k | mocha | latte | nord | dracula
         data-scheme: dark | light   （auto 时由脚本按系统偏好设置）
    ══════════════════════════════════════════════════════════════════ */
 
-/* ── 1. 7kimisu 深色（默认）── */
+/* ── 1. Qiangge 深色（默认）── */
 :root,
 [data-theme="7k"][data-scheme="dark"] {
   --bg:        #0b0f12;
@@ -37,7 +37,7 @@
   --shadow:    0 10px 30px rgba(0, 0, 0, .45);
 }
 
-/* ── 2. 7kimisu 浅色 ── */
+/* ── 2. Qiangge 浅色 ── */
 [data-theme="7k"][data-scheme="light"] {
   --bg:        #f4f6f8;
   --bg-soft:   #eceff3;

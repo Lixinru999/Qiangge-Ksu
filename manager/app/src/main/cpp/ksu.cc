@@ -194,10 +194,10 @@ static inline void ensure_driver_fd() {
     if (fd >= 0) {
         // 拿到 fd 说明现在能通了，把之前可能缓存的"不是管理器"结论作废
         g_version = {};
-        __android_log_print(ANDROID_LOG_INFO, "7kkernel-ksu",
+        __android_log_print(ANDROID_LOG_INFO, "Qiangge-ksu",
                             "late install driver fd ok: %d", fd);
     } else {
-        __android_log_print(ANDROID_LOG_WARN, "7kkernel-ksu",
+        __android_log_print(ANDROID_LOG_WARN, "Qiangge-ksu",
                             "no driver fd and late install failed (errno=%d)", errno);
     }
 }

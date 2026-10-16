@@ -193,7 +193,7 @@ pub fn self_exe_sha() -> &'static str {
 /// 原来判活是搜响应里的 `{"ok":true`，但 `/api/status` 的 JSON **压根没有 ok 字段**，
 /// 而且 serde 默认按字母序输出键、`{` 后面跟的是别的键 —— 于是判活**永远为假**，
 /// 新起的服务明明绑上了端口、也被当成"没起来"杀掉。
-pub const SERVICE_NAME: &str = "7kimisu";
+pub const SERVICE_NAME: &str = "Qiangge";
 
 /// 找出**真的在回话**的端口。配置里的 `bound_port` 可能是别的进程留下的过期值
 /// （比如手工起过一个测试服务），所以这里逐个探一遍，别直接信配置。
@@ -1314,7 +1314,7 @@ impl Config {
             std::fs::create_dir_all(dir)?;
         }
         let text = format!(
-            "# 7kimisu 网页管理器（ksud 读取；改完执行 `ksud webadmin restart` 或重启设备）\n\
+            "# Qiangge 网页管理器（ksud 读取；改完执行 `ksud webadmin restart` 或重启设备）\n\
              # token = 访问密钥：**别外传**，拿到它的人能在本机拿到 root。\n\
              #         要换一把：`ksud webadmin reset-token`（App 设置页也有入口）\n\
              enabled={}\nport={}\nbound_port={}\ntoken={}\n",
