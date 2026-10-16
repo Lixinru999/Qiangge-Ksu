@@ -4,12 +4,10 @@ import android.app.Application
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.os.Build
+import android.os.Bundle
 import android.os.UserManager
 import android.system.Os
 import android.util.Log
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import com.sevenk.core.core.crash.CrashEvidenceClassifier
@@ -427,17 +425,30 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
 
         // ── 彻底隐藏(v2.32):应用进入后台时自动隐藏桌面图标 ──────────────
         // 仅当「彻底隐藏」开关开着 且 隐身模式开着时才生效。
-        // 用户划掉管理器后台 → onStop → 禁用启动器组件 → 桌面图标消失。
+        // 用户划掉管理器后台 → 最后一个 Activity onStop → 禁用启动器组件 → 桌面图标消失。
         // 恢复只能靠拨号密令(StealthReceiver 关隐身 + ensureLauncherVisible)。
+        // 用 ActivityLifecycleCallbacks 而非 ProcessLifecycleOwner：后者在 lifecycle-process 模块，
+        // 本项目没引入；前者是 Application 原生 API，零依赖。
         runCatching {
             val prefs = SettingsRepositoryImpl()
-            ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
-                override fun onStop(owner: LifecycleOwner) {
-                    if (prefs.deepHideEnabled && com.sevenk.core.ui.security.Stealth.isEnabled()) {
-                        com.sevenk.core.ui.security.Stealth.hideLauncher(ksuApp)
-                        Log.i(TAG, "彻底隐藏:应用进入后台,已隐藏桌面图标")
+            registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+                private var activityCount = 0
+                override fun onActivityStarted(a: android.app.Activity) { activityCount++ }
+                override fun onActivityStopped(a: android.app.Activity) {
+                    activityCount--
+                    if (activityCount <= 0) {
+                        activityCount = 0
+                        if (prefs.deepHideEnabled && com.sevenk.core.ui.security.Stealth.isEnabled()) {
+                            com.sevenk.core.ui.security.Stealth.hideLauncher(ksuApp)
+                            Log.i(TAG, "彻底隐藏:应用进入后台,已隐藏桌面图标")
+                        }
                     }
                 }
+                override fun onActivityCreated(a: android.app.Activity, b: Bundle?) {}
+                override fun onActivityResumed(a: android.app.Activity) {}
+                override fun onActivityPaused(a: android.app.Activity) {}
+                override fun onActivitySaveInstanceState(a: android.app.Activity, b: Bundle) {}
+                override fun onActivityDestroyed(a: android.app.Activity) {}
             })
         }.onFailure { Log.w(TAG, "注册彻底隐藏后台监听失败(忽略): ", it) }
     }
