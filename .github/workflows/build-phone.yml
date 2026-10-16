@@ -37,7 +37,7 @@ jobs:
       uses: gradle/actions/setup-gradle@v4
 
     - name: Decode signing keystore
-      if: github.event_name != 'pull_request' && secrets.KEYSTORE != ''
+      if: github.event_name != 'pull_request'
       run: |
         echo "${{ secrets.KEYSTORE }}" | base64 -d > key.jks
         {
