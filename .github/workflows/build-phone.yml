@@ -1,0 +1,78 @@
+name: Build Phone App
+
+on:
+  push:
+    branches: [ "main", "dev", "ci" ]
+    paths:
+      - 'phone-app/**'
+      - '.github/workflows/build-phone.yml'
+      - 'manager/app/src/main/java/com/sevenk/core/ui/security/StealthReceiver.kt'
+  pull_request:
+    branches: [ "main", "dev" ]
+    paths:
+      - 'phone-app/**'
+      - '.github/workflows/build-phone.yml'
+      - 'manager/app/src/main/java/com/sevenk/core/ui/security/StealthReceiver.kt'
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build-phone:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: phone-app
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+
+    - name: Setup JDK
+      uses: actions/setup-java@v6
+      with:
+        distribution: temurin
+        java-version: 21
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+
+    - name: Decode signing keystore
+      if: github.event_name != 'pull_request' && secrets.KEYSTORE != ''
+      run: |
+        echo "${{ secrets.KEYSTORE }}" | base64 -d > key.jks
+        {
+          echo KEYSTORE_PASSWORD='${{ secrets.KEYSTORE_PASSWORD }}'
+          echo KEY_ALIAS='${{ secrets.KEY_ALIAS }}'
+          echo KEY_PASSWORD='${{ secrets.KEY_PASSWORD }}'
+          echo KEYSTORE_FILE='key.jks'
+        } >> gradle.properties
+
+    - name: Decode PR signing keystore
+      if: github.event_name == 'pull_request'
+      run: |
+        # PR 无法访问本仓库 Secrets，生成一次性临时密钥，够编译就行
+        keytool -genkeypair -v \
+          -keystore pr-key.jks \
+          -storepass prpass123 \
+          -keypass prkey123 \
+          -alias pr-key \
+          -keyalg RSA -keysize 2048 \
+          -validity 1 -storetype JKS \
+          -dname "CN=PR Build, OU=PR, O=PR, C=US"
+        {
+          echo KEYSTORE_PASSWORD='prpass123'
+          echo KEY_ALIAS='pr-key'
+          echo KEY_PASSWORD='prkey123'
+          echo KEYSTORE_FILE='pr-key.jks'
+        } >> gradle.properties
+
+    - name: Build release APK
+      run: chmod +x ./gradlew && ./gradlew :app:assembleRelease --no-daemon --stacktrace
+
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: phone-app
+        path: phone-app/app/build/outputs/apk/release/*.apk
+        if-no-files-found: error
+        overwrite: true

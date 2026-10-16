@@ -2,7 +2,8 @@ plugins {
     id("com.android.application")
 }
 
-val ksFile = findProperty("KS_FILE") as String?
+// 和管理器 apksign DSL 用同一套属性名，CI 里复用同一份 Secrets 无需额外映射
+val ksFile = findProperty("KEYSTORE_FILE") as String?
 
 android {
     namespace = "com.qiangge.phone"
@@ -23,9 +24,9 @@ android {
         if (ksFile != null) {
             create("rel") {
                 storeFile = file(ksFile)
-                storePassword = findProperty("KS_STORE_PASSWORD") as String?
-                keyAlias = findProperty("KS_ALIAS") as String?
-                keyPassword = findProperty("KS_KEY_PASSWORD") as String?
+                storePassword = findProperty("KEYSTORE_PASSWORD") as String?
+                keyAlias = findProperty("KEY_ALIAS") as String?
+                keyPassword = findProperty("KEY_PASSWORD") as String?
             }
         }
     }
