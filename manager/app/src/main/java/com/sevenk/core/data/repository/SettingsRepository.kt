@@ -103,7 +103,7 @@ interface SettingsRepository {
     /** 重力方向校准:0=正常 1=左右翻转 2=上下翻转 3=反转180° */
     var gravityMode: Int
 
-    /** 隐身模式的拨号密令数字(如 70707 对应 *#*#70707#*#*) */
+    /** 隐身模式的拨号密令数字(如 626725 对应 *#*#626725#*#*) */
     var stealthCode: String
 
     /**

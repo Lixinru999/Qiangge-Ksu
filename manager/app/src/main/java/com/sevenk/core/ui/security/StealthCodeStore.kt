@@ -12,8 +12,8 @@ import com.sevenk.core.ui.util.getRootShell
  *   · 隐身状态存在**内核侧** `/data/adb/sevenk/stealth` —— 卸载 App 也不会丢;
  *   · 而密令数字以前只存在 **App 自己的 shared_prefs** 里 —— 卸载就没了。
  *   于是:改了自定义密令 → 卸载重装 → 内核仍处于隐身(界面伪装成"未安装"),
- *   而 App 里的"期望密令"已经退回默认 70707 → 你输入自己那个自定义密令,
- *   和 70707 不匹配 → 接收器**静默忽略** → 恢复不回来,彻底锁死。
+ *   而 App 里的"期望密令"已经退回默认 626725 → 你输入自己那个自定义密令,
+ *   和 626725 不匹配 → 接收器**静默忽略** → 恢复不回来,彻底锁死。
  *
  * 所以这里把密令额外写一份到 `/data/adb/sevenk/stealth_code`(root,卸载不丢),
  * 读取时**优先用它**,拿不到才退回 App 设置,再退回默认值。
@@ -50,7 +50,7 @@ object StealthCodeStore {
     private const val LEGACY_PATH = "/data/adb/ksu/stealth_code"
 
     /** 默认密令(和 StealthReceiver 保持一致) */
-    const val DEFAULT_CODE = "70707"
+    const val DEFAULT_CODE = "626725"
 
     /**
      * KernelSU 自己那些文件的 SELinux 类型(和 ksud 的 `restorecon.rs` 里 `KSU_CON` 同一个值)。
@@ -144,7 +144,7 @@ object StealthCodeStore {
      *
      * 取并集之后,磁盘和设置里的**任意一个**都能开锁,不会再因为两份不一致而锁死。
      *
-     * ⚠️ 有意**不**把默认值 70707 作为"万能兜底"塞进来 —— 那等于给所有人一把钥匙,
+     * ⚠️ 有意**不**把默认值 626725 作为"万能兜底"塞进来 —— 那等于给所有人一把钥匙,
      *    会削弱隐身本身的意义。只有两边都**没配**时才用默认值(全新安装的正常情况)。
      */
     fun acceptedCodes(context: Context? = null): Set<String> {

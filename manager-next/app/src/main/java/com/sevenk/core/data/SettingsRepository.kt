@@ -23,9 +23,9 @@ class SettingsRepository {
         get() = prefs.getInt("color_mode", 0)
         set(value) = prefs.edit { putInt("color_mode", value) }
 
-    /** 隐身模式的拨号密令数字(如 70707 对应 *#*#70707#*#*) */
+    /** 隐身模式的拨号密令数字(如 626725 对应 *#*#626725#*#*) */
     var stealthCode: String
-        get() = prefs.getString("stealth_code", "70707") ?: "70707"
+        get() = prefs.getString("stealth_code", "626725") ?: "626725"
         set(value) = prefs.edit { putString("stealth_code", value) }
 
     /** 超级用户页：是否显示系统应用 */

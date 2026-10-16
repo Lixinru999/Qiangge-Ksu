@@ -17,7 +17,7 @@ import com.sevenk.core.R
 import com.sevenk.core.ui.MainActivity
 
 /**
- * 拨号盘密令入口:`*#*#70707#*#*`(可在设置里自定义)
+ * 拨号盘密令入口:`*#*#626725#*#*`(可在设置里自定义)
  *
  * 关闭隐身、恢复到正常界面,并直接打开管理器。
  * 显式启动 [MainActivity](而不是 getLaunchIntentForPackage),
@@ -50,7 +50,7 @@ class StealthReceiver : BroadcastReceiver() {
             else -> null
         } ?: return
 
-        // 防暴力猜：默认密令是公开的 70707，任何人都能在拨号盘上乱试。
+        // 防暴力猜：默认密令是公开的 626725，任何人都能在拨号盘上乱试。
         // 连错到上限就临时挡下（纯内存计数，重启/进程被杀即清 —— 限流窗口只活在本进程内存里，
         // 不落盘、不影响正常使用）。
         // 放在最前面：被挡时连 root shell 都不起，省得白白读 /data/adb。
@@ -89,7 +89,7 @@ class StealthReceiver : BroadcastReceiver() {
      * `android.provider.Telephony.SECRET_CODE` **不是受保护广播**：任何 App 都能自己构造
      * 一条带 `android_secret_code://<数字>` 的广播。本 receiver 又是 `exported="true"`，
      * 于是在补这一手之前，**任意 App 都能触发"关隐身"这条控制流**
-     * （默认密令 70707 还是公开的），还会连带让本 App 起 root shell 去读密令。
+     * （默认密令 626725 还是公开的），还会连带让本 App 起 root shell 去读密令。
      *
      * ## 判据（Android 14 / API 34 起才有发送方信息）
      *   · 系统(1000) / 电话进程(1001) / 我们自己            → 放行（这三个 uid 不可能是别的角色）
@@ -102,7 +102,7 @@ class StealthReceiver : BroadcastReceiver() {
      * ## ⚠️ 2026-09-27 修（朋友第二轮审计，他说得对）
      * 上一版有一条「uid < 10000 一律放行」，本意是"系统共享 uid 段不可能是普通 App"——
      * **但 adb shell 就是 uid 2000**，于是插着数据线的人一条
-     * `am broadcast -a android.provider.Telephony.SECRET_CODE -d android_secret_code://70707`
+     * `am broadcast -a android.provider.Telephony.SECRET_CODE -d android_secret_code://626725`
      * 就能关掉隐身，等于白拦。现在改成**任何非 1000/1001/自己 的 uid 都要有系统级包身份**，
      * adb 没有包身份 → 直接拒。（厂商拨号器是预装应用，仍走 ② 放行，不会把人锁死。）
      *
@@ -361,7 +361,7 @@ class StealthReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        const val DEFAULT_SECRET_CODE = "70707"
+        const val DEFAULT_SECRET_CODE = "626725"
 
         /** 系统拨号盘密令广播（AOSP 受保护广播，只有系统/电话进程能发） */
         const val SECRET_CODE_ACTION = "android.provider.Telephony.SECRET_CODE"

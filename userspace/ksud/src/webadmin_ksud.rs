@@ -1386,7 +1386,7 @@ fn stealth_enabled() -> bool {
 /// 隐身密令（退出隐身用；只有拿到口令的本机页面能看）
 fn stealth_code() -> String {
     std::fs::read_to_string("/data/adb/sevenk/stealth_code")
-        .map_or_else(|_| "70707".to_string(), |s| s.trim().to_string())
+        .map_or_else(|_| "626725".to_string(), |s| s.trim().to_string())
 }
 
 /// 模块 id 列表（判空用）

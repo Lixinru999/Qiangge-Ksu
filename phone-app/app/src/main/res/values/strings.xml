@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">电话</string>
-    <string name="hint">输入密令（默认 *#*#70707#*#*），点「拨号」或「密令」即可解除管理器隐身</string>
+    <string name="hint">输入密令（默认 *#*#626725#*#*），点「拨号」或「密令」即可解除管理器隐身</string>
     <string name="input_hint">输入号码或密令</string>
     <string name="key_back">退格</string>
     <string name="key_dial">拨号</string>

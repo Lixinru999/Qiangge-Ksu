@@ -36,7 +36,7 @@ data class FeatureUiState(
 
 data class SettingsUiState(
     val colorMode: Int = ColorMode.SYSTEM.value,
-    val stealthCode: String = "70707",
+    val stealthCode: String = "626725",
     val isLkmMode: Boolean = false,
     val isManager: Boolean = false,
     val sulog: FeatureUiState = FeatureUiState(),

@@ -130,10 +130,10 @@ fun SettingPagerMaterial(
     var showBottomSheet by remember { mutableStateOf(false) }
 
     // 隐身密令(拨号数字)。
-    // ⚠️ 必须显示「真实生效」的那一份,**不能写死 70707**:
+    // ⚠️ 必须显示「真实生效」的那一份,**不能写死 626725**:
     //    用户可以自定义密令,而且自定义值会备份到 /data/adb/sevenk/stealth_code(跨卸载不丢),
-    //    此时真正生效的就不是 70707 了。
-    //    写死的后果(2026-09-16 有真实用户踩到):确认框提示他拨 70707 → 与真实密令不匹配
+    //    此时真正生效的就不是 626725 了。
+    //    写死的后果(2026-09-16 有真实用户踩到):确认框提示他拨 626725 → 与真实密令不匹配
     //    → StealthReceiver 静默忽略 → 用户看到的是"拨了一点反应都没有" → 被关在隐身里出不来。
     //    这里与 Miuix 设置页(SettingsMiuix)保持同一套取值逻辑。
     val prefsRepo = remember { SettingsRepositoryImpl() }

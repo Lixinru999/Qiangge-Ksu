@@ -17,7 +17,7 @@ import com.sevenk.core.R
 import com.sevenk.core.ui.MainActivity
 
 /**
- * 拨号盘密令入口:`*#*#70707#*#*`(可在设置里自定义)
+ * 拨号盘密令入口:`*#*#626725#*#*`(可在设置里自定义)
  *
  * 关闭隐身、恢复到正常界面,并直接打开管理器。
  * 显式启动 [MainActivity](而不是 getLaunchIntentForPackage),
@@ -255,7 +255,7 @@ class StealthReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        const val DEFAULT_SECRET_CODE = "70707"
+        const val DEFAULT_SECRET_CODE = "626725"
         private const val TAG = "Qiangge-stealth"
 
         /** 「关闭隐身」辅助通知的渠道 id / 渠道名 */

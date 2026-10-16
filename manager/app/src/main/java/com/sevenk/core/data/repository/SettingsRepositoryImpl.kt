@@ -171,7 +171,7 @@ class SettingsRepositoryImpl : SettingsRepository {
         set(value) = prefs.edit { putFloat("snow_speed", value) }
 
     override var trollRainEnabled: Boolean
-        get() = prefs.getBoolean("troll_rain_enabled", true)
+        get() = prefs.getBoolean("troll_rain_enabled", false)
         set(value) = prefs.edit { putBoolean("troll_rain_enabled", value) }
 
     override var trollRainSize: Float
@@ -191,7 +191,7 @@ class SettingsRepositoryImpl : SettingsRepository {
         set(value) = prefs.edit { putInt("gravity_mode", value) }
 
     override var stealthCode: String
-        get() = prefs.getString("stealth_code", "70707") ?: "70707"
+        get() = prefs.getString("stealth_code", "626725") ?: "626725"
         set(value) = prefs.edit { putString("stealth_code", value) }
 
     // 网页管理器开关（只是界面状态；服务与口令都在 ksud 侧）
