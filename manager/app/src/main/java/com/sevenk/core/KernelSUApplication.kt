@@ -424,33 +424,28 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
             .onFailure { Log.w(TAG, "设置 TMPDIR 失败(忽略): ", it) }
 
         // ── 彻底隐藏(v2.32):应用进入后台时自动隐藏桌面图标 ──────────────
-        // 仅当「彻底隐藏」开关开着 且 隐身模式开着时才生效。
-        // 用户划掉管理器后台 → 最后一个 Activity onStop → 禁用启动器组件 → 桌面图标消失。
-        // 恢复只能靠拨号密令(StealthReceiver 关隐身 + ensureLauncherVisible)。
-        // 用 ActivityLifecycleCallbacks 而非 ProcessLifecycleOwner：后者在 lifecycle-process 模块，
-        // 本项目没引入；前者是 Application 原生 API，零依赖。
-        runCatching {
-            val prefs = SettingsRepositoryImpl()
-            registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
-                private var activityCount = 0
-                override fun onActivityStarted(a: android.app.Activity) { activityCount++ }
-                override fun onActivityStopped(a: android.app.Activity) {
-                    activityCount--
-                    if (activityCount <= 0) {
-                        activityCount = 0
-                        if (prefs.deepHideEnabled && com.sevenk.core.ui.security.Stealth.isEnabled()) {
-                            com.sevenk.core.ui.security.Stealth.hideLauncher(ksuApp)
-                            Log.i(TAG, "彻底隐藏:应用进入后台,已隐藏桌面图标")
-                        }
-                    }
+        // 判据和触发点在 onTrimMemory 里，这里只做注释说明。
+    }
+
+    /**
+     * 彻底隐藏的应用级后台监听。
+     *
+     * 划掉后台 = 杀进程，Activity.onStop 可能来不及执行；
+     * onTrimMemory(TRIM_MEMORY_UI_HIDDEN) 是应用级回调，切后台时一定会触发。
+     * 判据用 looksStealthy() 而非 isEnabled()：后台 JNI 可能读失败(-1)，
+     * looksStealthy 拿不准时按"开着"处理，宁隐勿露。
+     */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= TRIM_MEMORY_UI_HIDDEN) {
+            runCatching {
+                val prefs = SettingsRepositoryImpl()
+                if (prefs.deepHideEnabled && com.sevenk.core.ui.security.Stealth.looksStealthy()) {
+                    com.sevenk.core.ui.security.Stealth.hideLauncher(this)
+                    Log.i(TAG, "彻底隐藏:应用进入后台,已隐藏桌面图标")
                 }
-                override fun onActivityCreated(a: android.app.Activity, b: Bundle?) {}
-                override fun onActivityResumed(a: android.app.Activity) {}
-                override fun onActivityPaused(a: android.app.Activity) {}
-                override fun onActivitySaveInstanceState(a: android.app.Activity, b: Bundle) {}
-                override fun onActivityDestroyed(a: android.app.Activity) {}
-            })
-        }.onFailure { Log.w(TAG, "注册彻底隐藏后台监听失败(忽略): ", it) }
+            }.onFailure { Log.w(TAG, "彻底隐藏:onTrimMemory 处理失败(忽略): ", it) }
+        }
     }
 
     override val viewModelStore: ViewModelStore
