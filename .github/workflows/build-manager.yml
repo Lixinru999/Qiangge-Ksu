@@ -118,8 +118,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - target: x86_64-pc-windows-gnu # windows pc
-            os: ubuntu-latest
+          # 注：ksud 依赖 Unix 专有 API（std::os::unix），在 Windows 目标下无法编译
+          # （error[E0433]: cannot find `unix` in `os`），且桌面版对手机端无用，故不再构建。
           - target: x86_64-apple-darwin # Intel mac
             os: macos-latest
           - target: aarch64-apple-darwin # M chip mac
