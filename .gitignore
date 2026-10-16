@@ -1,0 +1,16 @@
+.idea
+.vscode
+.DS_Store
+/target
+.cargo/config.toml
+__pycache__
+/dist
+/repack-config.json
+/userspace/ksud/.lkm_image_bootstrap.o
+/out
+
+# 构建缓存与产物（不应入库）
+.gradle/
+.cxx/
+build/
+*.apk
