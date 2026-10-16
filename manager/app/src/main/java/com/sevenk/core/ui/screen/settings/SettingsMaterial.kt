@@ -995,29 +995,23 @@ fun SettingPagerMaterial(
                                 }
                             )
                         }
-                        // 彻底隐藏(v2.32):隐身模式下划掉后台 → 桌面图标自动消失,
-                        // 只能拨 *#*#626725#*#* 恢复。需要先开隐身模式才有效。
+                        // 彻底隐藏(v2.32):开启后,隐身模式下划掉后台 → 桌面图标自动消失,
+                        // 只能拨 *#*#626725#*#* 恢复。
+                        // ⚠️ 顺序很重要:先开「彻底隐藏」,再开「隐身模式」——
+                        //    因为隐身一开,设置页里的 root 项全隐藏,就找不到这个开关了。
                         add {
                             val stealthOn = com.sevenk.core.ui.security.Stealth.isEnabled()
                             SegmentedSwitchItem(
                                 icon = Icons.Filled.Lock,
                                 title = "彻底隐藏",
                                 summary = if (!stealthOn)
-                                    "需先开启「隐身模式」才生效;开启后划掉后台自动隐藏图标,只能拨号密令恢复"
+                                    "开启后,隐身模式下划掉后台自动隐藏桌面图标,只能拨号密令恢复"
                                 else if (deepHideEnabled)
                                     "已开启:划掉后台后桌面图标会消失,拨 *#*#${stealthCode}#*#* 恢复"
                                 else
-                                    "开启后,隐身模式下划掉后台自动隐藏桌面图标,只能拨号密令恢复",
+                                    "当前已隐身:开关本项后再划掉后台,桌面图标会消失;拨 *#*#${stealthCode}#*#* 恢复",
                                 checked = deepHideEnabled,
                                 onCheckedChange = { v ->
-                                    if (v && !stealthOn) {
-                                        android.widget.Toast.makeText(
-                                            context,
-                                            "请先开启「隐身模式」",
-                                            android.widget.Toast.LENGTH_LONG
-                                        ).show()
-                                        return@SegmentedSwitchItem
-                                    }
                                     deepHideEnabled = v
                                     prefsRepo.deepHideEnabled = v
                                     if (!v) {
