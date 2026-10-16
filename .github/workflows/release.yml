@@ -9,9 +9,13 @@ jobs:
   build-manager:
     uses: ./.github/workflows/build-manager.yml
     secrets: inherit
+  build-phone:
+    uses: ./.github/workflows/build-phone.yml
+    secrets: inherit
   release:
     needs:
       - build-manager
+      - build-phone
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
@@ -58,6 +62,15 @@ jobs:
             fi
           done
 
+      - name: Rename phone apk
+        run: |
+          mkdir -p phone
+          for f in ./phone-app/*.apk; do
+            if [ -f "$f" ]; then
+              mv "$f" "phone/Qiangge_Phone-release.apk"
+            fi
+          done
+
       - name: Display structure of downloaded files
         run: ls -R
 
@@ -69,3 +82,4 @@ jobs:
             lkm/lkm-*_sevenk.ko
             ksud/ksud-*
             ksuinit/*
+            phone/*.apk
