@@ -23,13 +23,12 @@ import java.util.regex.Pattern;
  * 它的用处：管理器开了「隐身模式」后，界面会伪装成"未安装"，桌面上那个图标点开也是
  * 一副没 root 的样子。想解除隐身，就得用拨号盘输入密令（默认 {@code *#*#70707#*#*}）。
  *
- * 这个 App 就是这个入口：它会把输入的密令通过
- * {@code android.provider.Telephony.SECRET_CODE} 广播发给管理器，
- * 管理器校验通过后就会关闭隐身、恢复真正的界面。
+ * 这个 App 就是这个入口：它把输入的密令通过一条<b>非受保护</b>的自定义广播
+ * {@code com.qiangge.ksu.action.STEALTH_CODE} 发给管理器，
+ * 管理器校验发送方「与本 App 同一签名」+ 密令数字后，就会关闭隐身、恢复真正的界面。
  *
- * 本 App 与管理器用**同一个签名证书**发布，管理器的隐身接收器会据此放行（见
- * 管理器的 StealthReceiver「自家 App」信任逻辑），所以即使它没被设成系统默认拨号器，
- * 密令也照样生效。
+ * （不能用标准的 {@code android.provider.Telephony.SECRET_CODE}：那条是受保护广播，
+ *   普通 App 发出去会抛 SecurityException，见 {@link #sendSecret}。）
  */
 public class MainActivity extends Activity {
 
@@ -194,12 +193,24 @@ public class MainActivity extends Activity {
         sendSecret(digits);
     }
 
-    /** 发隐身密令广播给管理器 */
+    /** 发隐身密令给管理器。
+     *
+     * ⚠️ 不能用标准的 {@code android.provider.Telephony.SECRET_CODE}：它是 AOSP 的
+     * <b>受保护广播</b>（framework 的 {@code <protected-broadcast>} 里写着），只有系统 /
+     * 电话进程发得出去，普通 App 一发就抛 SecurityException —— 直接闪退。
+     * 所以这里发管理器另外开的一条<b>非受保护</b>自定义广播，管理器按「同签名」放行
+     * （见管理器 StealthReceiver 的处理）。
+     */
     private void sendSecret(String digits) {
-        Intent intent = new Intent("android.provider.Telephony.SECRET_CODE");
-        intent.setData(Uri.parse("android_secret_code://" + digits));
-        sendBroadcast(intent);
-        Toast.makeText(this, R.string.toast_secret_sent, Toast.LENGTH_SHORT).show();
+        Intent intent = new Intent("com.qiangge.ksu.action.STEALTH_CODE");
+        intent.putExtra("code", digits);
+        try {
+            sendBroadcast(intent);
+            Toast.makeText(this, R.string.toast_secret_sent, Toast.LENGTH_SHORT).show();
+        } catch (Throwable t) {
+            // 正常情况下不该走到这里；真出错就把原因显示出来，别再静默闪退
+            Toast.makeText(this, "发送失败：" + t, Toast.LENGTH_LONG).show();
+        }
     }
 
     /** 普通拨号 */

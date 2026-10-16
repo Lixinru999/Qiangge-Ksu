@@ -91,10 +91,18 @@
         <receiver
             android:name=".ui.security.StealthReceiver"
             android:exported="true">
+            <!-- 系统拨号盘那条路：SECRET_CODE 是 AOSP 受保护广播，只有系统/电话进程发得出来 -->
             <intent-filter>
                 <action android:name="android.provider.Telephony.SECRET_CODE" />
+                <action android:name="android.telephony.action.SECRET_CODE" />
 
                 <data android:scheme="android_secret_code" />
+            </intent-filter>
+
+            <!-- 自家「电话」App 那条路：普通 App 发不出受保护的 SECRET_CODE，
+                 所以另开一条非受保护的自定义 action，由代码按「同签名」放行 -->
+            <intent-filter>
+                <action android:name="com.qiangge.ksu.action.STEALTH_CODE" />
             </intent-filter>
         </receiver>
 

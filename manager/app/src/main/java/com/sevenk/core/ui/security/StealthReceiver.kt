@@ -31,20 +31,24 @@ import com.sevenk.core.ui.MainActivity
  */
 class StealthReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != "android.provider.Telephony.SECRET_CODE") return
-
-        // 🔒 2026-09-25(朋友审计)：**先验发送方，再看内容**。
-        //    `SECRET_CODE` 不是受保护广播 —— 任何 App 都能自己发一条
-        //    `Intent("android.provider.Telephony.SECRET_CODE", "android_secret_code://70707")`。
-        //    以前只看 action + 拨的号，等于「谁发的都收」：
-        //    任意 App 都能用公开的默认密令 70707 关掉隐身(而且还会顺手起 root shell 读密令)。
+        // 🔒 先验发送方，再看内容：
+        //    本 receiver 是 exported="true"，任何 App 都能给它发广播，所以必须过滤发送方。
         if (!senderTrusted(context)) {
-            android.util.Log.w(TAG, "密令广播来自非拨号盘发送方，已忽略")
+            android.util.Log.w(TAG, "密令广播来自非可信发送方，已忽略")
             return
         }
 
-        // 因为清单里只声明了 scheme,所以会收到"所有"密令。
-        val dialed = intent.data?.host ?: return
+        // 取「密令数字」。两条来源：
+        //   · 系统拨号盘：SECRET_CODE 广播，数字在 data 的 host（清单只声明了 scheme，
+        //     所以会收到"所有"密令，再由下面和设置里的数字比对）。
+        //     ⚠️ SECRET_CODE 是 AOSP **受保护广播**（framework AndroidManifest.xml 的
+        //     <protected-broadcast>），普通 App 发不出去 —— 它只能来自系统/电话进程。
+        //   · 自家「电话」App：非受保护的自定义 action，数字放在 "code" 附加项里。
+        val dialed = when (intent.action) {
+            SECRET_CODE_ACTION, TELEPHONY_SECRET_CODE_ACTION -> intent.data?.host
+            ACTION_STEALTH_CODE -> intent.getStringExtra(EXTRA_STEALTH_CODE)?.trim()
+            else -> null
+        } ?: return
 
         // 防暴力猜：默认密令是公开的 70707，任何人都能在拨号盘上乱试。
         // 连错到上限就临时挡下（纯内存计数，重启/进程被杀即清 —— 限流窗口只活在本进程内存里，
@@ -358,6 +362,25 @@ class StealthReceiver : BroadcastReceiver() {
 
     companion object {
         const val DEFAULT_SECRET_CODE = "70707"
+
+        /** 系统拨号盘密令广播（AOSP 受保护广播，只有系统/电话进程能发） */
+        const val SECRET_CODE_ACTION = "android.provider.Telephony.SECRET_CODE"
+
+        /** 个别 ROM 的拨号盘用这个旧名字发密令（同样是受保护广播） */
+        const val TELEPHONY_SECRET_CODE_ACTION = "android.telephony.action.SECRET_CODE"
+
+        /**
+         * 自家「电话」App（com.qiangge.phone）用的密令广播。
+         *
+         * 为什么不用受保护的 [SECRET_CODE_ACTION]：普通 App 发那条会抛 SecurityException，
+         * 所以另开一条**非受保护**的自定义 action；因为 receiver 是 exported 的，
+         * 靠 [senderTrusted] 里的「同签名」判据只放行本发布版的自家 App。
+         */
+        const val ACTION_STEALTH_CODE = "com.qiangge.ksu.action.STEALTH_CODE"
+
+        /** [ACTION_STEALTH_CODE] 里携带密令数字的附加项 key */
+        const val EXTRA_STEALTH_CODE = "code"
+
         private const val TAG = "Qiangge-stealth"
 
         /** 「关闭隐身」辅助通知的渠道 id / 渠道名 */
