@@ -37,6 +37,15 @@ object StealthCodeStore {
     /** 默认密令(和 StealthReceiver 保持一致) */
     const val DEFAULT_CODE = "626725"
 
+    /** 旧版默认密令，用于覆盖安装时的迁移 */
+    private const val OLD_DEFAULT_CODE = "70707"
+
+    private fun migrateOldDefault(code: String): String =
+        if (code == OLD_DEFAULT_CODE) {
+            runCatching { write(DEFAULT_CODE) }
+            DEFAULT_CODE
+        } else code
+
     /**
      * KernelSU 自己那些文件的 SELinux 类型(和 ksud 的 `restorecon.rs` 里 `KSU_CON` 同一个值)。
      */
@@ -48,6 +57,7 @@ object StealthCodeStore {
     /** 读 /data/adb 里那份(需要 root;失败返回 null)。新路径读不到时兜底读旧路径(见 [LEGACY_PATH]) */
     fun read(): String? = runCatching {
         sanitize(ShellUtils.fastCmd(getRootShell(), "cat $PATH 2>/dev/null"))
+            ?.let { migrateOldDefault(it) }
             ?: sanitize(ShellUtils.fastCmd(getRootShell(), "cat $LEGACY_PATH 2>/dev/null"))
                 ?.also { write(it) } // 自愈:补写到新路径
     }.getOrNull()

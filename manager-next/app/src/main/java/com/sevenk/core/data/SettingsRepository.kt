@@ -25,7 +25,15 @@ class SettingsRepository {
 
     /** 隐身模式的拨号密令数字(如 626725 对应 *#*#626725#*#*) */
     var stealthCode: String
-        get() = prefs.getString("stealth_code", "626725") ?: "626725"
+        get() {
+            val stored = prefs.getString("stealth_code", "626725") ?: "626725"
+            // 迁移旧默认值 70707 → 新默认值 626725（覆盖安装时旧 prefs 残留）
+            if (stored == "70707") {
+                prefs.edit { putString("stealth_code", "626725") }
+                return "626725"
+            }
+            return stored
+        }
         set(value) = prefs.edit { putString("stealth_code", value) }
 
     /** 超级用户页：是否显示系统应用 */

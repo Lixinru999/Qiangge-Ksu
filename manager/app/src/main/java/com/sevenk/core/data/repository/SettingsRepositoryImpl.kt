@@ -191,7 +191,17 @@ class SettingsRepositoryImpl : SettingsRepository {
         set(value) = prefs.edit { putInt("gravity_mode", value) }
 
     override var stealthCode: String
-        get() = prefs.getString("stealth_code", "626725") ?: "626725"
+        get() {
+            val stored = prefs.getString("stealth_code", "626725") ?: "626725"
+            // 迁移：旧默认值 70707 → 新默认值 626725。
+            // 覆盖安装时旧 shared_prefs 里还存着 70707，而 getString 的默认值只在 key 不存在时生效，
+            // 所以必须主动把旧默认值迁过来，否则用户看到的还是 70707。
+            if (stored == "70707") {
+                prefs.edit { putString("stealth_code", "626725") }
+                return "626725"
+            }
+            return stored
+        }
         set(value) = prefs.edit { putString("stealth_code", value) }
 
     // 网页管理器开关（只是界面状态；服务与口令都在 ksud 侧）
