@@ -169,8 +169,11 @@ class StealthReceiver : BroadcastReceiver() {
         android.util.Log.i(TAG, "收到密令(内容已隐去) 候选=${accepted.size} 隐身状态=$kernelState")
         if (dialed !in accepted) {
             android.util.Log.w(TAG, "密令不匹配,已忽略")
+            // 给用户一个反馈,避免"拨了没反应"不知道为啥
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                Toast.makeText(context, "密令不匹配", Toast.LENGTH_SHORT).show()
+            }
             // 防暴力猜：连错 MAX_FAILS 次就临时锁 BLOCK_MILLIS（纯内存，重启即清）。
-            // 注意：比对逻辑本身（取并集、trim、大小写）一个字都没动，这里只是加计数。
             fails++
             if (fails >= MAX_FAILS) {
                 blockedUntil = System.currentTimeMillis() + BLOCK_MILLIS
@@ -179,23 +182,24 @@ class StealthReceiver : BroadcastReceiver() {
             }
             return RestorePlan(showRestore = false, message = "")
         }
-        // 匹配成功：清空失败计数，别让以前手滑几次留下的计数影响后面
+        // 匹配成功：清空失败计数
         fails = 0
 
-        // ⚠️ v2.1(审计 P0-2):三态。以前 `wasEnabled = Stealth.isEnabled()` 会把
-        //    "读失败(-1)"和"明确关着(0)"压成同一个 false,于是文案胡说八道。
         val wasEnabled = kernelState == 1
         val restored = Stealth.setEnabled(false)
-        // 拨号恢复:强制恢复桌面图标(不检查持久化标志,避免标志写入失败导致图标不恢复)
+        // 无论关隐身是否成功,都强制恢复桌面图标(避免用户被锁在外面)
         Stealth.forceShowLauncher(context)
-        // 只有"**原本确实在隐身** 且 **这次确实关成功**"才补通知（见 notifyStealthRestored 注释）。
-        // ⚠️ 必须额外看 wasEnabled：Stealth.setEnabled(false) 对**本来就关着**的情况
-        //    也会返回成功，光看 restored 会给"本来就没开隐身"的人白发一条
-        //    「已关闭隐身」，凭空打扰。
+        // 只有原本确实在隐身且这次关成功才发通知
         if (wasEnabled && restored) {
             notifyStealthRestored(context)
         }
         android.util.Log.i(TAG, "恢复完成:kernelState=$kernelState restored=$restored")
+        if (!restored) {
+            // 关隐身失败时也提示用户
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                Toast.makeText(context, "关闭隐身失败,请重启设备后重试", Toast.LENGTH_LONG).show()
+            }
+        }
         return RestorePlan(
             showRestore = true,
             // 四种情况说四句真话(审计 P0-2 + 🟡4 v2.4):
