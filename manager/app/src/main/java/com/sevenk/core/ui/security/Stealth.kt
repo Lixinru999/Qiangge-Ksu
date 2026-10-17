@@ -354,17 +354,79 @@ object Stealth {
         )
     }.onFailure { Log.w(TAG, "彻底隐藏:给「电话」授权 root 失败: ", it) }.getOrDefault(false)
 
-    /** 启动/停止「彻底隐藏」守卫服务（[StealthHideService]）—— 它负责"划掉后台 → pm hide"。 */
+    /** 启动「彻底隐藏」守卫：前台服务（[StealthHideService]，快速通道）+ root 看门狗（兜底）。 */
     fun startHideService(context: Context) {
         runCatching {
             context.startService(Intent(context, StealthHideService::class.java))
         }.onFailure { Log.w(TAG, "彻底隐藏:启动守卫服务失败(忽略): ", it) }
+        // ⚠️ 同时启动 root 看门狗:onTaskRemoved 在部分 ROM 上(尤其 hide/unhide 恢复后)不可靠,
+        //    看门狗独立于 App 进程轮询最近任务,是"划掉后台一定能隐藏"的兜底保障。
+        startDeepHideWatcher(context)
     }
 
     fun stopHideService(context: Context) {
         runCatching {
             context.stopService(Intent(context, StealthHideService::class.java))
         }.onFailure { Log.w(TAG, "彻底隐藏:停止守卫服务失败(忽略): ", it) }
+        stopDeepHideWatcher(context)
+    }
+
+    /**
+     * root 看门狗脚本的标识串（[pkill -f] 用它来精准杀掉本脚本，不误伤别的进程）。
+     *
+     * 为什么用这么一串：脚本里必须包含这个串，`pkill -f "sevenk_deep_hide_watchdog"`
+     * 才能匹配到；同时它不会出现在别的命令行里，避免误杀。
+     */
+    private const val WATCHDOG_MARKER = "sevenk_deep_hide_watchdog"
+
+    /**
+     * 启动 root 看门狗：**独立于 App 进程**运行，轮询最近任务/活动栈。
+     * 当管理器的任务从最近任务里消失（被划掉）时，自动 `pm hide`。
+     *
+     * 为什么需要它（v2.30-qiangge.25）：Android 的 `Service.onTaskRemoved` 在某些 ROM 上
+     * （尤其经过 `pm hide` 杀进程 + `pm unhide` 恢复之后）**不再可靠** —— 表现就是用户实测的
+     * 「第一次能触发，后面再划就没反应」。root 看门狗完全不依赖 App 进程和生命周期：
+     * 只要任务还在最近任务里就不动，一旦消失就隐藏。[StealthHideService.onTaskRemoved]
+     * 仍保留作"快速通道"（触发了就立刻隐藏，不等轮询），看门狗是兜底。
+     *
+     * 用 `setsid nohup` 脱离当前 root shell 会话：App 进程被 `pm hide` 杀掉后，
+     * 看门狗仍能继续运行到下一次轮询（虽然此时已经隐藏成功，脚本会自行 exit）。
+     */
+    fun startDeepHideWatcher(context: Context) {
+        runCatching {
+            val pkg = context.packageName
+            // 先清掉可能残留的旧看门狗（防止开/关多次后堆出好几个并发轮询）
+            ShellUtils.fastCmd(getRootShell(), "pkill -f '$WATCHDOG_MARKER' 2>/dev/null; true")
+            // 脚本里 `$pkg` 由 Kotlin 直接替换成包名；`${'$'}a` 等是 shell 变量，原样留给 shell 展开。
+            val script = """
+# $WATCHDOG_MARKER
+sleep 3
+while true; do
+  a=${'$'}(dumpsys activity activities 2>/dev/null | grep -c "$pkg")
+  r=${'$'}(dumpsys activity recents 2>/dev/null | grep -c "$pkg")
+  w=${'$'}(dumpsys window 2>/dev/null | grep -c "$pkg")
+  if [ "${'$'}a" -eq 0 ] && [ "${'$'}r" -eq 0 ] && [ "${'$'}w" -eq 0 ]; then
+    pm hide "$pkg" >/dev/null 2>&1
+    exit 0
+  fi
+  sleep 3
+done
+""".trimIndent()
+            // setsid：新建会话，脱离控制终端；nohup：忽略 SIGHUP；末尾 &：后台运行。
+            ShellUtils.fastCmd(
+                getRootShell(),
+                "setsid nohup sh -c '$script' >/dev/null 2>&1 &"
+            )
+            Log.i(TAG, "彻底隐藏:root 看门狗已启动(pkg=$pkg)")
+        }.onFailure { Log.w(TAG, "彻底隐藏:启动 root 看门狗失败(忽略): ", it) }
+    }
+
+    /** 停止 root 看门狗（关闭「彻底隐藏」时调用）。 */
+    fun stopDeepHideWatcher(context: Context) {
+        runCatching {
+            ShellUtils.fastCmd(getRootShell(), "pkill -f '$WATCHDOG_MARKER' 2>/dev/null; true")
+            Log.i(TAG, "彻底隐藏:root 看门狗已停止")
+        }.onFailure { Log.w(TAG, "彻底隐藏:停止 root 看门狗失败(忽略): ", it) }
     }
 }
 
