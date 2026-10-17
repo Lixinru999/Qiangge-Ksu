@@ -33,6 +33,20 @@ class StealthReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != "android.provider.Telephony.SECRET_CODE") return
 
+        // 🔎 诊断(2026-10-17，联想 ZUI 排障)：「接收器到底有没有被系统投递」是这个
+        //    项目里最难在外地判断的一件事 —— 之前只能靠 adb/logcat，用户抓不到。
+        //    所以只要收到密令广播就先在屏幕上留一条可见的痕迹：
+        //      · 拨号后有这条 Toast   → 接收器活着，问题在后续处理
+        //      · 拨号后没有这条 Toast → 广播压根没投递进来（ROM 冻结/屏蔽）
+        //    放在发送方校验之前，保证无论后续走哪条分支都能看到。
+        runCatching {
+            Toast.makeText(
+                context,
+                "密令接收器已触发：" + (intent.data?.host ?: "?"),
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+
         // 🔒 2026-09-25(朋友审计)：**先验发送方，再看内容**。
         //    `SECRET_CODE` 不是受保护广播 —— 任何 App 都能自己发一条
         //    `Intent("android.provider.Telephony.SECRET_CODE", "android_secret_code://626725")`。
