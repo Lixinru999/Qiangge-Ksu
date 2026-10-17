@@ -1,6 +1,7 @@
 package com.sevenk.core.ui.security
 
-import android.app.ActivityManager
+import android.app.Activity
+import android.app.Application
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -9,6 +10,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.os.Bundle
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -25,29 +27,54 @@ import kotlinx.coroutines.launch
 /**
  * 「彻底隐藏」的后台守卫。
  *
- * 检测"用户从最近任务里划掉管理器"的**两条独立路径**:
- *   1. [onTaskRemoved] —— 系统回调,最快(划掉立刻触发),但部分 ROM 上不可靠
- *      (尤其经过 `pm hide` 杀进程 + `pm unhide` 恢复之后,可能再也不回调)。
- *   2. [pollRecents] 轮询 —— 在前台服务里每 2 秒查一次 [ActivityManager.getAppTasks],
- *      一旦本应用的任务从最近任务里消失,就执行 `pm hide`。这条不依赖系统回调,
- *      是"划掉后台一定能隐藏"的兜底保障(v2.30-qiangge.26)。
+ * 检测"用户关闭管理器"的两条独立路径:
+ *   1. [onTaskRemoved] —— 系统回调,最快,但部分 ROM 上不可靠(从不回调或回调一次后失效)。
+ *   2. Activity 生命周期监听 —— 注册 [Application.ActivityLifecycleCallbacks],
+ *      当**所有 Activity 都被销毁**(onDestroy)时,延迟 2 秒确认后执行 `pm hide`。
+ *      - 按 Home / 切到别的 App:Activity 只 stop,不 destroy → 不隐藏。
+ *      - 划掉最近任务:Activity 被 destroy → 隐藏。
+ *      - 旋转屏幕:Activity destroy 后立刻 recreate,2 秒内 live 计数回正 → 不误隐藏。
  *
- * 为什么用服务而不是 `Activity.onPause`:`onActivityPaused` 在"任何一次离开前台"都会触发 ——
- * 包括用户为了授权「悬浮窗」跳到系统设置页那一下。若在那时隐藏,界面会当着用户的面消失,
- * 直接把人锁在外面。"任务从最近任务消失"才精确对应"划掉后台"这个动作。
+ * ⚠️ 为什么不用 `ActivityManager.appTasks` 轮询(v2.30-qiangge.26):在本设备上,
+ *    `stopWithTask=false` 会让任务在划掉后**仍留在 appTasks 里**,轮询永远判不到"消失",
+ *    实测 diag 里只有"守卫服务已启动"、没有任何"触发=轮询"。改用生命周期回调后
+ *    不依赖任务列表,Activity 一销毁就知道。
  *
- * ⚠️ **必须是「前台服务」**:普通后台服务在 App 退到后台后,会被系统的
- *    「后台执行限制」在大约一分钟内停掉。服务一旦被停,用户随后划掉最近任务时
- *    **`onTaskRemoved` 根本不会被回调**,轮询也跟着停。转成前台服务后不再受该限制。
- *
- * ⚠️ 清单里必须写 `android:stopWithTask="false"` —— 否则划掉任务时服务会先被销毁,
- *    就收不到 `onTaskRemoved`、轮询也停了。
- *
- * 恢复只能靠已授权的「电话」App 用 root 执行 `pm unhide` + 拉起管理器。
+ * ⚠️ **必须是前台服务 + stopWithTask=false**:否则划掉任务时进程被杀,
+ *    onDestroy 回调和后续 `pm hide` 都来不及执行。
  */
 class StealthHideService : Service() {
 
-    private var poller: Job? = null
+    private var hideTimer: Job? = null
+    private var liveActivities = 0
+
+    private val lifecycleCallbacks = object : Application.ActivityLifecycleCallbacks {
+        override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
+            liveActivities++
+            // 有新 Activity 创建 → 取消待执行的隐藏(旋转屏幕等场景)
+            hideTimer?.cancel()
+            hideTimer = null
+            Log.d(TAG, "生命周期:onActivityCreated live=$liveActivities")
+        }
+
+        override fun onActivityStarted(activity: Activity) {}
+        override fun onActivityResumed(activity: Activity) {}
+        override fun onActivityPaused(activity: Activity) {}
+        override fun onActivityStopped(activity: Activity) {}
+        override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+
+        override fun onActivityDestroyed(activity: Activity) {
+            liveActivities = (liveActivities - 1).coerceAtLeast(0)
+            Log.d(TAG, "生命周期:onActivityDestroyed live=$liveActivities finishing=${activity.isFinishing}")
+            if (liveActivities <= 0) {
+                Stealth.logHideDiag(
+                    this@StealthHideService,
+                    "生命周期:所有 Activity 已销毁(live=0),2 秒后尝试隐藏"
+                )
+                scheduleHide()
+            }
+        }
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -55,72 +82,59 @@ class StealthHideService : Service() {
         super.onCreate()
         runCatching { goForeground() }
             .onFailure { Log.w(TAG, "彻底隐藏:转前台服务失败(忽略): ", it) }
-        Stealth.logHideDiag(this, "守卫服务已启动(前台+轮询)")
-        startPolling()
+        runCatching {
+            (applicationContext as? Application)
+                ?.registerActivityLifecycleCallbacks(lifecycleCallbacks)
+        }.onFailure { Log.w(TAG, "彻底隐藏:注册生命周期回调失败(忽略): ", it) }
+        Stealth.logHideDiag(this, "守卫服务已启动(前台+生命周期监听)")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // ⚠️ 每次 startService 都要再确认一次前台状态:进程被系统重起后 onStartCommand 会重新送达,
-        //    这里补调 startForeground 才能继续享受"不被后台限制停掉"的待遇。
         runCatching { goForeground() }
             .onFailure { Log.w(TAG, "彻底隐藏:转前台服务失败(忽略): ", it) }
         return START_STICKY
     }
 
     override fun onDestroy() {
-        poller?.cancel()
-        poller = null
+        hideTimer?.cancel()
+        hideTimer = null
+        runCatching {
+            (applicationContext as? Application)
+                ?.unregisterActivityLifecycleCallbacks(lifecycleCallbacks)
+        }
         super.onDestroy()
     }
 
     /**
-     * 轮询最近任务:每 2 秒查一次 [ActivityManager.getAppTasks]。
-     *
-     * 本应用的任务还在最近任务里 → 不动;任务消失了(被划掉)→ 执行 `pm hide`。
-     * 启动后先等 3 秒,让 App 完全启动、任务进入最近任务,避免一上来就误判。
+     * 所有 Activity 销毁后延迟 2 秒再隐藏:
+     * 旋转屏幕时 Activity 会 destroy→recreate,2 秒内 live 计数回正就取消隐藏。
      */
-    private fun startPolling() {
-        poller?.cancel()
-        poller = CoroutineScope(Dispatchers.Default).launch {
-            delay(3000)
-            while (isActive) {
-                runCatching { checkAndHide() }
-                delay(2000)
-            }
+    private fun scheduleHide() {
+        hideTimer?.cancel()
+        hideTimer = CoroutineScope(Dispatchers.Default).launch {
+            delay(2000)
+            if (liveActivities > 0) return@launch  // 期间有新 Activity 起来了(旋转等),不隐藏
+            checkAndHide()
         }
     }
 
     private fun checkAndHide() {
-        val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return
-        // appTasks 返回本应用(UID)在最近任务里的任务列表。
-        // 用户划掉后台 → 任务从最近任务移除 → 列表变空。
-        val tasks = runCatching { am.appTasks }.getOrDefault(emptyList())
-        if (tasks.isNotEmpty()) return  // 任务还在,不隐藏
-
         val enabled = SettingsRepositoryImpl().deepHideEnabled
         var phoneRoot = Stealth.isPhoneRootGranted(this)
-        // 兜底:若「电话」App 被重装/换过 uid,先前写下的授权按新 uid 可能查不到。
-        // 只要还能用 root,就趁现在补写一次授权再放行。
         if (enabled && !phoneRoot) {
             phoneRoot = runCatching { Stealth.grantPhoneRoot(this) }
                 .getOrDefault(false) && Stealth.isPhoneRootGranted(this)
         }
-        Stealth.logHideDiag(this, "触发=轮询 任务数=${tasks.size} 开关=$enabled 电话root=$phoneRoot")
+        Stealth.logHideDiag(this, "触发=生命周期 开关=$enabled 电话root=$phoneRoot")
         if (!enabled) return
         if (!phoneRoot) {
             Log.w(TAG, "彻底隐藏:已开启,但「电话」没有永久 root,跳过隐藏(防止锁死)")
             return
         }
-        Log.i(TAG, "彻底隐藏:轮询检测到任务被划掉,执行 pm hide")
+        Log.i(TAG, "彻底隐藏:所有 Activity 已销毁,执行 pm hide")
         Stealth.hidePackage(this)
     }
 
-    /**
-     * 转成前台服务 —— 这是"划掉后台能可靠触发隐藏"的**前提条件**。
-     *
-     * 通知刻意做到最低存在感:渠道 `IMPORTANCE_LOW`(不响铃、不弹横幅,只在下拉通知栏里
-     * 静静排一条;前台服务的通知不允许比 LOW 更低)、`setSilent(true)`、锁屏不显示内容。
-     */
     private fun goForeground() {
         val nm = getSystemService(NotificationManager::class.java) ?: return
         val channel = NotificationChannel(
@@ -156,12 +170,7 @@ class StealthHideService : Service() {
         )
     }
 
-    /**
-     * 最近任务里划掉管理器 → 隐藏整个包(快速通道)。
-     *
-     * 双重闸门:既要「彻底隐藏」开着,又要「电话」App 当前**确实持有永久 root**。
-     * `pm hide` 会在命令执行完后强制结束本进程,所以这里同步跑。
-     */
+    /** 快速通道:系统回调 onTaskRemoved 时立刻隐藏。 */
     override fun onTaskRemoved(rootIntent: Intent?) {
         runCatching {
             val enabled = SettingsRepositoryImpl().deepHideEnabled
@@ -172,11 +181,7 @@ class StealthHideService : Service() {
             }
             Stealth.logHideDiag(this, "触发=划掉后台 开关=$enabled 电话root=$phoneRoot")
             if (!enabled) return@runCatching
-            if (!phoneRoot) {
-                Log.w(TAG, "彻底隐藏:已开启,但「电话」没有永久 root,跳过隐藏(防止锁死)")
-                return@runCatching
-            }
-            Log.i(TAG, "彻底隐藏:任务被划掉,执行 pm hide")
+            if (!phoneRoot) return@runCatching
             Stealth.hidePackage(this)
         }.onFailure { Log.w(TAG, "彻底隐藏:onTaskRemoved 失败(忽略): ", it) }
         super.onTaskRemoved(rootIntent)
