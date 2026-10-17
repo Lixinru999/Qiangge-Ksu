@@ -113,6 +113,19 @@ interface SettingsRepository {
     var deepHideEnabled: Boolean
 
     /**
+     * 「彻底隐藏」的自查记录（诊断用）。
+     *
+     * `StealthHideService.onTaskRemoved` 每次被触发时都会往这里同步写一条记录
+     * （含是否开启、电话是否已授权、`pm hide` 的原始输出）。发生时 App 会被
+     * `pm hide` 直接杀掉，所以必须**同步落盘**才留得下来。
+     *
+     * 用途：设置页显示"上次划掉后台时到底发生了什么"——
+     *  · 空字符串 = 划掉后台从未触发过（是触发环节的问题）；
+     *  · 有内容 = 触发了，直接看 `pm hide` 的结果就知道为啥没隐藏。
+     */
+    var deepHideDiag: String
+
+    /**
      * 网页管理器的开关（**只是界面上的开关状态**）。
      *
      * 真正的服务跑在 **ksud（root 守护进程）** 里，配置和口令存在

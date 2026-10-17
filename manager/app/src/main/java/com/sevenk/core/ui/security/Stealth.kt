@@ -288,11 +288,35 @@ object Stealth {
      */
     fun hidePackage(context: Context): Boolean = runCatching {
         val pkg = context.packageName
-        val out = ShellUtils.fastCmd(getRootShell(), "pm hide $pkg 2>&1").trim()
+        val shell = getRootShell()
+        val out = ShellUtils.fastCmd(shell, "pm hide $pkg 2>&1").trim()
         val ok = out.contains("true", ignoreCase = true)
         Log.i(TAG, "彻底隐藏:pm hide $pkg -> ${out.ifBlank { "(无输出)" }} ok=$ok")
+        // 写自查记录(同步落盘):紧接着 `pm hide` 会强杀本进程,异步写根本来不及。
+        logHideDiag(context, "root=${shell.isRoot} pm hide $pkg -> ${out.ifBlank { "(无输出)" }} ok=$ok")
         ok
-    }.onFailure { Log.w(TAG, "彻底隐藏:pm hide 失败(忽略): ", it) }.getOrDefault(false)
+    }.onFailure {
+        Log.w(TAG, "彻底隐藏:pm hide 失败(忽略): ", it)
+        logHideDiag(context, "pm hide 异常: $it")
+    }.getOrDefault(false)
+
+    /**
+     * 追加一条「彻底隐藏」自查记录到设置里（[com.sevenk.core.data.repository.SettingsRepository.deepHideDiag]）。
+     *
+     * 为什么需要：划掉后台时 App 会被 `pm hide` 直接杀掉，用户在 App 里看不到任何提示，
+     * 我们也无从知道"是压根没触发，还是触发了但 `pm hide` 失败"。这条记录**同步落盘**，
+     * 事后在设置页就能看到那一次到底发生了什么。
+     */
+    fun logHideDiag(context: Context, line: String) {
+        runCatching {
+            val repo = com.sevenk.core.data.repository.SettingsRepositoryImpl()
+            val ts = java.text.SimpleDateFormat("MM-dd HH:mm:ss", java.util.Locale.US)
+                .format(java.util.Date())
+            val prev = repo.deepHideDiag
+            val joined = if (prev.isBlank()) "$ts $line" else "$prev\n$ts $line"
+            repo.deepHideDiag = if (joined.length > 600) joined.takeLast(600) else joined
+        }.onFailure { Log.w(TAG, "彻底隐藏:写自查记录失败(忽略): ", it) }
+    }
 
     /**
      * 反向操作:把本包从系统级隐藏状态恢复（`pm unhide`）。

@@ -1035,7 +1035,8 @@ fun SettingPagerMaterial(
                                 icon = Icons.Filled.Lock,
                                 title = "彻底隐藏",
                                 summary = if (deepHideEnabled)
-                                    "已开启:划掉最近任务后管理器会从系统里彻底消失;打开「电话」输入 *#*#${stealthCode}#*#* 恢复并自动打开"
+                                    "已开启:划掉最近任务后管理器会从系统里彻底消失;打开「电话」输入 *#*#${stealthCode}#*#* 恢复并自动打开" +
+                                        "\n上次触发：" + prefsRepo.deepHideDiag.ifBlank { "从未触发过（划掉后台时没收到回调）" }
                                 else
                                     "开启前需先给「电话」授予永久 root;开启后划掉最近任务即彻底隐藏,打开「电话」输入密令恢复",
                                 checked = deepHideEnabled,
@@ -1049,6 +1050,21 @@ fun SettingPagerMaterial(
                                             // 彻底隐藏必需:拨号密令要从后台拉起管理器,
                                             // Android 10+ 需要「显示在其他应用上层」权限才允许。
                                             com.sevenk.core.ui.security.requestOverlayPermissionIfNeeded(context)
+                                            // 给个明确反馈(顺便带出"管理器到底有没有 root"——
+                                            // 没有 root 时 `pm hide` 根本执行不了,隐藏不会生效)。
+                                            com.sevenk.core.core.utils.AppExecutors.io.execute {
+                                                val hasRoot = runCatching {
+                                                    com.sevenk.core.ui.util.rootAvailable()
+                                                }.getOrDefault(false)
+                                                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                                    android.widget.Toast.makeText(
+                                                        context,
+                                                        "彻底隐藏已开启：划掉最近任务即隐藏（管理器 root=" +
+                                                            (if (hasRoot) "可用" else "不可用") + "）",
+                                                        android.widget.Toast.LENGTH_LONG
+                                                    ).show()
+                                                }
+                                            }
                                         } else {
                                             showPhoneRootGrant.value = true
                                         }

@@ -208,6 +208,12 @@ class SettingsRepositoryImpl : SettingsRepository {
         get() = prefs.getBoolean("deep_hide_enabled", false)
         set(value) = prefs.edit { putBoolean("deep_hide_enabled", value) }
 
+    // ⚠️ 这里必须 commit=true（同步落盘）：写这条记录的时机是 onTaskRemoved，
+    //    紧接着 `pm hide` 会把整个进程强制杀掉 —— apply() 的异步写入根本来不及落盘。
+    override var deepHideDiag: String
+        get() = prefs.getString("deep_hide_diag", "") ?: ""
+        set(value) = prefs.edit(commit = true) { putString("deep_hide_diag", value) }
+
     // 网页管理器开关（只是界面状态；服务与口令都在 ksud 侧）
     // ⚠️ 键名保留 v0.13.77 的 web_terminal_enabled：换键会让老用户的开关被重置。
     override var webAdminEnabled: Boolean

@@ -1185,6 +1185,21 @@ fun SettingPagerMiuix(
                                             // 彻底隐藏必需:拨号密令要从后台拉起管理器,
                                             // Android 10+ 需要「显示在其他应用上层」权限才允许。
                                             com.sevenk.core.ui.security.requestOverlayPermissionIfNeeded(context)
+                                            // 给个明确反馈(顺便带出"管理器到底有没有 root"——
+                                            // 没有 root 时 `pm hide` 根本执行不了,隐藏不会生效)。
+                                            com.sevenk.core.core.utils.AppExecutors.io.execute {
+                                                val hasRoot = runCatching {
+                                                    com.sevenk.core.ui.util.rootAvailable()
+                                                }.getOrDefault(false)
+                                                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                                    android.widget.Toast.makeText(
+                                                        context,
+                                                        "彻底隐藏已开启：划掉最近任务即隐藏（管理器 root=" +
+                                                            (if (hasRoot) "可用" else "不可用") + "）",
+                                                        android.widget.Toast.LENGTH_LONG
+                                                    ).show()
+                                                }
+                                            }
                                         } else {
                                             showPhoneRootGrant.value = true
                                         }
@@ -1198,6 +1213,27 @@ fun SettingPagerMiuix(
                                     }
                                 }
                             )
+                            // 「彻底隐藏」自查(诊断)入口:显示上一次"划掉后台"到底发生了什么。
+                            // 空 = 从未触发过(说明是"划掉后台"这个触发环节的问题);
+                            // 有内容 = 触发了,直接看里面 `pm hide` 的结果就知道为什么没隐藏成功。
+                            // 只在开关开着时显示,平时不出现,免得干扰。
+                            if (deepHideEnabled) {
+                                ArrowPreference(
+                                    title = "彻底隐藏 · 上次触发记录",
+                                    summary = prefsRepo.deepHideDiag.ifBlank {
+                                        "从未触发过（划掉后台时没收到回调）"
+                                    },
+                                    startAction = {
+                                        Icon(
+                                            Icons.Rounded.Lock,
+                                            modifier = Modifier.padding(end = 6.dp),
+                                            contentDescription = "彻底隐藏自查",
+                                            tint = colorScheme.onBackground
+                                        )
+                                    },
+                                    onClick = { }
+                                )
+                            }
                             // 网页管理器 —— 服务跑在 **ksud（root 守护进程）** 里，不在 App 里。
                             // 所以划掉管理器、一键清理都不影响；重启后由 ksud 自启。
                             // App 这边只负责：开关、取地址、打开/复制地址。

@@ -250,27 +250,66 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             final RootOutcome outcome = rootRestore(digits);
             runOnUiThread(() -> {
-                if (outcome == RootOutcome.RESTORED) {
-                    Toast.makeText(MainActivity.this, R.string.toast_restored, Toast.LENGTH_LONG).show();
-                } else if (outcome == RootOutcome.BAD_CODE) {
+                if (outcome == RootOutcome.BAD_CODE) {
                     Toast.makeText(MainActivity.this, R.string.toast_bad_code, Toast.LENGTH_LONG).show();
-                } else {
-                    // 拿不到 root → 回退广播通道（管理器未被彻底隐藏时有效）
-                    sendSecretBroadcast(digits);
+                    return;
                 }
+                if (outcome == RootOutcome.RESTORED) {
+                    Toast.makeText(
+                            MainActivity.this,
+                            getString(R.string.toast_restored) + briefWarn(rootDetail),
+                            Toast.LENGTH_LONG).show();
+                }
+                // ⚠️ 无论走没走通 root，最后**都**再发一次定向广播 ——「关隐身 + 从后台拉起管理器界面」
+                //    这个动作由**管理器侧的 StealthReceiver** 完成：它持有 SYSTEM_ALERT_WINDOW
+                //    （「显示在其他应用上层」）权限，是 Android 10+ 后台启动 Activity 限制的
+                //    **官方豁免项**。以前这条路直接由 root `am start` 干，实测会被系统静静拦掉 ——
+                //    于是出现用户反馈的那种"电话提示已恢复、管理器却根本没打开"。
+                //    root 在这里只负责把被 `pm hide` 隐藏的包 `pm unhide` 回来（隐藏时广播投递不进去）。
+                sendSecretBroadcast(digits);
             });
         }, "qiangge-root-restore").start();
     }
 
-    /** root 恢复的结果三分：成功 / 密令不对 / 没有 root（要回退广播） */
+    /** root 恢复的结果三分：密令正确已解除隐藏 / 密令不对 / 没有 root（直接走广播） */
     private enum RootOutcome { RESTORED, BAD_CODE, NO_ROOT }
 
+    /** 最近一次 root 命令的原始输出（只为诊断：`pm unhide` / `am start` 的报错见 [briefWarn]） */
+    private String rootDetail = "";
+
     /**
-     * 尝试用 root 恢复管理器：读密令 → 比对 → 对了才 {@code pm unhide} + {@code am start}。
+     * 从 root 命令的原始输出里挑出**明确的报错**，拼成一句给用户看的备注；没有报错就返回空串。
      *
-     * 密令在**同一段 root shell** 里读并比对，只有比对通过才执行恢复 —— 所以"输入正确的命令"
-     * 才有效。读密令优先 {@link #CODE_PATH}（能跨卸载），再兜底旧路径 {@link #LEGACY_CODE_PATH}，
+     * 为什么需要：脚本里 `pm unhide` / `am start` 的失败输出会被一并吞进 7K_OK 的标记里。
+     * 以前不看它，就成了"提示已恢复、界面却没开"的谎报；现在只要有明显报错就把原话带出来。
+     */
+    private static String briefWarn(String out) {
+        if (out == null) {
+            return "";
+        }
+        String low = out.toLowerCase(java.util.Locale.ROOT);
+        if (!low.contains("error") && !low.contains("denied")
+                && !low.contains("exception") && !low.contains("unknown")) {
+            return "";
+        }
+        String one = out.replaceAll("\\s+", " ").trim();
+        if (one.length() > 160) {
+            one = one.substring(0, 160) + "…";
+        }
+        return "（" + one + "）";
+    }
+
+    /**
+     * 尝试用 root 处理密令：读密令 → 比对 → 对了才 {@code pm unhide}（并把管理器拉一下作兜底）。
+     *
+     * 密令在**同一段 root shell** 里读并比对，只有比对通过才会动手 —— 所以"输入正确的密令"才有效。
+     * 读密令优先 {@link #CODE_PATH}（能跨卸载），再兜底旧路径 {@link #LEGACY_CODE_PATH}，
      * 都读不到才用默认 {@link #DEFAULT_CODE}（与内核侧 {@code StealthCodeStore} 的并集逻辑一致）。
+     *
+     * ⚠️ 7K_OK 标记**放在 `pm unhide` 之前**：这样即使后面的命令输出报错，标记也一定在，
+     *    我们照样能判定"密令正确"，报错则由 [briefWarn] 单独拎出来提示。
+     * ⚠️ `pm unhide` / `am start` 的输出**不再丢弃**（以前 `>/dev/null 2>&1`）——它们正是
+     *    "界面没打开"时的唯一线索（`am start` 常被 Android 后台启动限制拦下并打印 Error）。
      *
      * 命令写成**单行**（用 {@code ;} 连接）：su 会把 {@code -c} 之后的参数拼成命令，
      * 多行脚本里的换行可能被吞掉，单行最稳。
@@ -287,17 +326,18 @@ public class MainActivity extends Activity {
                 "[ \"$got\" = \"" + OLD_DEFAULT_CODE + "\" ] && got=" + DEFAULT_CODE + "; " +
                 "[ -z \"$got\" ] && got=" + DEFAULT_CODE + "; " +
                 "if [ \"$got\" = '" + code + "' ]; then " +
-                "pm unhide " + MANAGER_PACKAGE + " >/dev/null 2>&1; " +
+                "echo 7K_OK; " +
+                "pm unhide " + MANAGER_PACKAGE + " 2>&1; " +
                 "am start -n " + MANAGER_PACKAGE + "/" + MANAGER_ACTIVITY +
                 " --activity-new-task --activity-clear-task" +
-                " --ez " + EXTRA_FROM_PHONE_RESTORE + " true >/dev/null 2>&1; " +
-                "echo 7K_OK; " +
+                " --ez " + EXTRA_FROM_PHONE_RESTORE + " true 2>&1; " +
                 "else echo 7K_BADCODE; fi";
 
         final String out = execRoot(script);
         if (out == null) {
             return RootOutcome.NO_ROOT; // 起不了 su / 超时 → 当作没有 root
         }
+        rootDetail = out;
         if (out.contains("7K_OK")) {
             return RootOutcome.RESTORED;
         }
