@@ -178,8 +178,11 @@ object Stealth {
     }
 
     /**
-     * 确保桌面图标在。每次启动、开机都调一次 ——
-     * 既保证正常状态下图标一定存在,也顺手把旧版本藏起来的图标找回来。
+     * 确保桌面图标在。每次启动、开机、拨号恢复都调一次。
+     *
+     * ⚠️ 同步执行:拨号恢复时必须在 startActivity 之前恢复图标,否则部分 ROM
+     *    会因为"启动入口被禁用"而拒绝拉起 Activity。setComponentEnabledSetting
+     *    是 Binder 调用,通常几毫秒,不会卡主线程。
      *
      * ⚠️ 彻底隐藏(v2.32):若用户开启了「彻底隐藏」且当前隐身开着,
      *    这里**不恢复图标**,反而保持隐藏 —— 否则开机/重启后图标自己冒出来,
@@ -189,37 +192,35 @@ object Stealth {
      * 持久化标志更可靠。
      */
     fun ensureLauncherVisible(context: Context) {
-        Thread {
-            runCatching {
-                val pm = context.packageManager
-                val component = ComponentName(context.packageName, LAUNCHER_ALIAS)
-                // 彻底隐藏开着 + 隐身开着 → 保持图标隐藏,不要恢复
-                val deepHide = runCatching {
-                    SettingsRepositoryImpl().deepHideEnabled
-                }.getOrDefault(false)
-                if (deepHide && isActivePersisted(context)) {
-                    if (pm.getComponentEnabledSetting(component) !=
-                        PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-                    ) {
-                        pm.setComponentEnabledSetting(
-                            component,
-                            PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                            PackageManager.DONT_KILL_APP
-                        )
-                    }
-                    return@runCatching
-                }
+        runCatching {
+            val pm = context.packageManager
+            val component = ComponentName(context.packageName, LAUNCHER_ALIAS)
+            // 彻底隐藏开着 + 隐身开着 → 保持图标隐藏,不要恢复
+            val deepHide = runCatching {
+                SettingsRepositoryImpl().deepHideEnabled
+            }.getOrDefault(false)
+            if (deepHide && isActivePersisted(context)) {
                 if (pm.getComponentEnabledSetting(component) !=
-                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED
                 ) {
                     pm.setComponentEnabledSetting(
                         component,
-                        PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                        PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
                         PackageManager.DONT_KILL_APP
                     )
                 }
+                return@runCatching
             }
-        }.start()
+            if (pm.getComponentEnabledSetting(component) !=
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+            ) {
+                pm.setComponentEnabledSetting(
+                    component,
+                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                    PackageManager.DONT_KILL_APP
+                )
+            }
+        }
     }
 
     /**

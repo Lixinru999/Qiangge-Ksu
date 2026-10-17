@@ -424,32 +424,47 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
             .onFailure { Log.w(TAG, "设置 TMPDIR 失败(忽略): ", it) }
 
         // ── 彻底隐藏(v2.32):应用进入后台时自动隐藏桌面图标 ──────────────
-        // 判据和触发点在 onTrimMemory 里，这里只做注释说明。
+        // 触发点:onActivityPaused(最可靠,划掉后台前一定会触发) + onTrimMemory(备用)。
+        // 部分国产 ROM(如联想 ZUI)划掉后台直接杀进程,onTrimMemory 可能来不及触发,
+        // 所以主要靠 onActivityPaused 兜底。
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            override fun onActivityPaused(a: android.app.Activity) {
+                tryHideLauncher()
+            }
+            override fun onActivityCreated(a: android.app.Activity, b: Bundle?) {}
+            override fun onActivityStarted(a: android.app.Activity) {}
+            override fun onActivityResumed(a: android.app.Activity) {}
+            override fun onActivityStopped(a: android.app.Activity) {}
+            override fun onActivitySaveInstanceState(a: android.app.Activity, b: Bundle) {}
+            override fun onActivityDestroyed(a: android.app.Activity) {}
+        })
     }
 
     /**
-     * 彻底隐藏的应用级后台监听。
-     *
-     * 划掉后台 = 杀进程，Activity.onStop 可能来不及执行；
-     * onTrimMemory(TRIM_MEMORY_UI_HIDDEN) 是应用级回调，切后台时一定会触发。
-     * 判据用 looksStealthy() 而非 isEnabled()：后台 JNI 可能读失败(-1)，
-     * looksStealthy 拿不准时按"开着"处理，宁隐勿露。
+     * 彻底隐藏:若「彻底隐藏」开着且隐身开着,隐藏桌面图标。
+     * 用持久化标志 isActivePersisted,不调 JNI,后台安全。
+     * hideLauncher 同步执行,确保进程被杀前完成。
+     */
+    private fun tryHideLauncher() {
+        runCatching {
+            val prefs = SettingsRepositoryImpl()
+            if (prefs.deepHideEnabled &&
+                com.sevenk.core.ui.security.Stealth.isActivePersisted(this)
+            ) {
+                com.sevenk.core.ui.security.Stealth.hideLauncher(this)
+                Log.i(TAG, "彻底隐藏:应用进入后台,已隐藏桌面图标")
+            }
+        }.onFailure { Log.w(TAG, "彻底隐藏:tryHideLauncher 失败(忽略): ", it) }
+    }
+
+    /**
+     * 彻底隐藏的应用级后台监听(备用)。
+     * onActivityPaused 是主触发点,onTrimMemory 作为备用。
      */
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         if (level >= TRIM_MEMORY_UI_HIDDEN) {
-            runCatching {
-                val prefs = SettingsRepositoryImpl()
-                // 用持久化标志 isActivePersisted 而非 looksStealthy():
-                // 后台 JNI 可能读失败,持久化标志只读 SharedPreferences,极快且可靠。
-                if (prefs.deepHideEnabled &&
-                    com.sevenk.core.ui.security.Stealth.isActivePersisted(this)
-                ) {
-                    // hideLauncher 已改为同步执行,确保进程被杀前完成
-                    com.sevenk.core.ui.security.Stealth.hideLauncher(this)
-                    Log.i(TAG, "彻底隐藏:应用进入后台,已隐藏桌面图标")
-                }
-            }.onFailure { Log.w(TAG, "彻底隐藏:onTrimMemory 处理失败(忽略): ", it) }
+            tryHideLauncher()
         }
     }
 
