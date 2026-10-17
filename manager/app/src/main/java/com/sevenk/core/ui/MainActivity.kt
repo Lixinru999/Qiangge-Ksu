@@ -260,6 +260,26 @@ class MainActivity : ComponentActivity() {
         // 确保桌面图标一直在(顺便把旧版本"隐藏图标"藏起来的图标找回来)
         Stealth.ensureLauncherVisible(this)
 
+        // 「电话」App 用 root 恢复并拉起本管理器时带这个附加项(见 Stealth.EXTRA_FROM_PHONE_RESTORE):
+        // 关闭隐身模式,让界面直接是正常的管理器(彻底隐藏可能和隐身模式同时开着)。
+        // ⚠️ 必须在 setContent 之前做完,否则界面会照隐身状态渲染一次再重建。
+        if (intent?.getBooleanExtra(Stealth.EXTRA_FROM_PHONE_RESTORE, false) == true) {
+            runCatching { Stealth.setEnabled(false) }
+                .onFailure { android.util.Log.w(TAG, "电话恢复:关闭隐身失败(忽略): ", it) }
+            // 基线对齐到"关" —— 免得 onResume 再白重建一次界面
+            lastSeenStealthState = Stealth.kernelState().let {
+                if (it == 0 || it == 1) it else STEALTH_STATE_UNKNOWN
+            }
+        }
+
+        // 彻底隐藏:开关开着就确保后台守卫服务在跑 —— 划掉最近任务时由它执行 `pm hide`。
+        // 服务内部还会再确认「电话」已获永久 root 才动手(见 StealthHideService),防止锁死。
+        if (runCatching { com.sevenk.core.data.repository.SettingsRepositoryImpl().deepHideEnabled }
+                .getOrDefault(false)
+        ) {
+            Stealth.startHideService(this)
+        }
+
         // 🟢 v2.15 删除（原本是 v2.13 新增的启动期工作）：
         //   这里以前每次启动都跑一次 `WebAdminCli.syncPref(true)` —— 那是一条 root shell
         //   命令（`ksud webadmin sync`）。而**设置页自己**在打开网页管理器那一项时就会

@@ -3,9 +3,13 @@ package com.sevenk.core.ui.security
 import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.util.Log
 import androidx.compose.ui.platform.LocalContext
 import com.sevenk.core.Natives
+import com.sevenk.core.ui.util.getRootShell
+import com.topjohnwu.superuser.ShellUtils
 
 /**
  * 隐身模式 = **只伪装界面**,不动桌面图标。
@@ -31,6 +35,23 @@ object Stealth {
 
     /** 拨号密令接收器组件名。保持启用,否则拨号恢复无从谈起。 */
     private const val STEALTH_RECEIVER = "com.sevenk.core.ui.security.StealthReceiver"
+
+    /** 隐身/彻底隐藏相关日志统一用这个 tag（与 StealthReceiver 等保持一致）。 */
+    private const val TAG = "7kkernel-stealth"
+
+    /**
+     * 「电话」App 的包名 —— 彻底隐藏之后**唯一**的恢复入口，
+     * 也是开启「彻底隐藏」之前必须被授予永久 root 的那个 App。
+     */
+    const val PHONE_PACKAGE = "com.qiangge.phone"
+
+    /**
+     * 拉起本管理器时带的附加项：表示"这次是已授权的「电话」App 用 root 恢复并打开的"。
+     *
+     * [com.sevenk.core.ui.MainActivity] 读到它就会**关闭隐身模式**，让界面直接是正常的管理器。
+     * 必须与 phone-app 发送侧写的 key **逐字符一致**。
+     */
+    const val EXTRA_FROM_PHONE_RESTORE = "from_phone_restore"
 
     /**
      * 内核 UAPI 里**隐身功能**是哪一版加进来的。
@@ -187,12 +208,12 @@ object Stealth {
      *
      * ⚠️ 同步执行:拨号恢复时必须在 startActivity 之前恢复图标。
      *
-     * ⚠️ 彻底隐藏(v2.33)与隐身模式**已彻底解耦**:
+     * ⚠️ 彻底隐藏与隐身模式**彻底解耦**:
      *    · 本函数**只负责"把图标恢复成启用"**,不再自动隐藏 ——
-     *      否则拨号把图标恢复后,MainActivity.onCreate 一进来又把它藏回去,
-     *      用户会看到"拨完号图标又没了"。
-     *    · "隐藏图标"只由 [hideLauncher] 在**应用退到后台时**触发
-     *      (见 KernelSUApplication.tryHideLauncher),与隐身开关无关。
+     *      否则恢复图标后,MainActivity.onCreate 一进来又把它藏回去,
+     *      用户会看到"恢复完图标又没了"。
+     *    · "隐藏整个包"只由 [hidePackage] 在**最近任务里划掉管理器时**触发
+     *      (见 [StealthHideService.onTaskRemoved]),与隐身开关无关。
      */
     fun ensureLauncherVisible(context: Context) {
         runCatching {
@@ -249,26 +270,77 @@ object Stealth {
     }
 
     /**
-     * 彻底隐藏:禁用桌面启动器组件,让桌面图标消失。
+     * 彻底隐藏:用系统级 `pm hide` 把**整个包**从系统应用列表里抹掉。
      *
-     * ⚠️ 只禁用 LauncherAlias,**绝不禁用 MainActivity**(理由见 [ensureLauncherVisible])。
+     * 和早期"只禁用桌面入口组件"的做法不同 —— `pm hide` 之后,设置里的「应用列表」、
+     * `pm list packages` 都**查不到**本包,包内所有组件(含拨号密令接收器)一并失效。
+     * 这正是用户要的"软件防查级别"隐藏。
      *
-     * 只能通过拨号密令([StealthReceiver])恢复 —— 恢复时调 [forceShowLauncher]。
+     * ⚠️ 只有「电话」App 用 root 执行 `pm unhide` 才能恢复 —— 所以开启前必须先给
+     * 「电话」授予永久 root 权限（见 [isPhoneRootGranted] / [grantPhoneRoot]），
+     * 否则隐藏了就再也找不回来。
+     *
+     * 触发点:最近任务里划掉管理器时（[StealthHideService.onTaskRemoved]）。
+     * **故意不挂在 `onActivityPaused`** —— 那样一旦用户为了授权「悬浮窗」跳去系统设置页,
+     * 界面一 pause 就会立刻把自己隐藏,把人锁在外面。
+     *
+     * 同步执行(root shell 往返,毫秒级),确保 `pm hide` 把本进程强制结束之前命令已经发出去。
      */
-    fun hideLauncher(context: Context) {
+    fun hidePackage(context: Context): Boolean = runCatching {
+        val pkg = context.packageName
+        val out = ShellUtils.fastCmd(getRootShell(), "pm hide $pkg 2>&1").trim()
+        val ok = out.contains("true", ignoreCase = true)
+        Log.i(TAG, "彻底隐藏:pm hide $pkg -> ${out.ifBlank { "(无输出)" }} ok=$ok")
+        ok
+    }.onFailure { Log.w(TAG, "彻底隐藏:pm hide 失败(忽略): ", it) }.getOrDefault(false)
+
+    /**
+     * 反向操作:把本包从系统级隐藏状态恢复（`pm unhide`）。
+     *
+     * 「电话」App 用 root 恢复时执行它；管理器侧在**关闭**「彻底隐藏」开关时也调一次兜底
+     * （万一之前被 hide 过而开关还留着）。
+     */
+    fun unhidePackage(context: Context): Boolean = runCatching {
+        val pkg = context.packageName
+        val out = ShellUtils.fastCmd(getRootShell(), "pm unhide $pkg 2>&1").trim()
+        Log.i(TAG, "彻底隐藏:pm unhide $pkg -> ${out.ifBlank { "(无输出)" }}")
+        true
+    }.onFailure { Log.w(TAG, "彻底隐藏:pm unhide 失败(忽略): ", it) }.getOrDefault(false)
+
+    /**
+     * 「电话」App 现在有没有**永久 root**（allowSu）。
+     *
+     * 这是「彻底隐藏」的**门禁**：没有它就不允许开启 —— 因为 `pm hide` 之后
+     * 拨号密令接收器会随包一起失效，没有任何手段能把管理器找回来，等于自己把自己锁死。
+     */
+    fun isPhoneRootGranted(context: Context): Boolean = runCatching {
+        val uid = context.packageManager.getApplicationInfo(PHONE_PACKAGE, 0).uid
+        Natives.getAppProfile(PHONE_PACKAGE, uid)?.allowSu == true
+    }.getOrDefault(false)
+
+    /**
+     * 给「电话」App 写入**永久 root 授权**（allowSu=true），一步到位，不用用户
+     * 自己去超级用户页里找。成功返回 true。
+     */
+    fun grantPhoneRoot(context: Context): Boolean = runCatching {
+        val uid = context.packageManager.getApplicationInfo(PHONE_PACKAGE, 0).uid
+        val current = Natives.getAppProfile(PHONE_PACKAGE, uid) ?: Natives.Profile(PHONE_PACKAGE)
+        Natives.setAppProfile(
+            current.copy(name = PHONE_PACKAGE, currentUid = uid, allowSu = true)
+        )
+    }.onFailure { Log.w(TAG, "彻底隐藏:给「电话」授权 root 失败: ", it) }.getOrDefault(false)
+
+    /** 启动/停止「彻底隐藏」守卫服务（[StealthHideService]）—— 它负责"划掉后台 → pm hide"。 */
+    fun startHideService(context: Context) {
         runCatching {
-            val pm = context.packageManager
-            val alias = ComponentName(context.packageName, LAUNCHER_ALIAS)
-            if (pm.getComponentEnabledSetting(alias) !=
-                PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-            ) {
-                pm.setComponentEnabledSetting(
-                    alias,
-                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                    PackageManager.DONT_KILL_APP
-                )
-            }
-        }
+            context.startService(Intent(context, StealthHideService::class.java))
+        }.onFailure { Log.w(TAG, "彻底隐藏:启动守卫服务失败(忽略): ", it) }
+    }
+
+    fun stopHideService(context: Context) {
+        runCatching {
+            context.stopService(Intent(context, StealthHideService::class.java))
+        }.onFailure { Log.w(TAG, "彻底隐藏:停止守卫服务失败(忽略): ", it) }
     }
 }
 

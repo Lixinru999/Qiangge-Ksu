@@ -48,6 +48,28 @@ public class MainActivity extends Activity {
     /** 管理器侧 StealthReceiver 收的自定义 action（非受保护广播，见其源码注释） */
     private static final String ACTION_STEALTH_CODE = MANAGER_PACKAGE + ".action.STEALTH_CODE";
 
+    /** 管理器主界面组件：applicationId / 类名（管理器 namespace 是 com.sevenk.core） */
+    private static final String MANAGER_ACTIVITY = "com.sevenk.core.ui.MainActivity";
+
+    /**
+     * 拉起管理器时带的附加项：表示"这次是已授权的「电话」用 root 恢复并打开的"。
+     * 必须与管理器侧 {@code Stealth.EXTRA_FROM_PHONE_RESTORE} **逐字符一致**。
+     */
+    private static final String EXTRA_FROM_PHONE_RESTORE = "from_phone_restore";
+
+    /** 密令落盘位置（与管理器 StealthCodeStore 一致，卸载重装不丢） */
+    private static final String CODE_PATH = "/data/adb/sevenk/stealth_code";
+    private static final String LEGACY_CODE_PATH = "/data/adb/ksu/stealth_code";
+
+    /** 默认密令（与管理器 StealthCodeStore.DEFAULT_CODE 一致） */
+    private static final String DEFAULT_CODE = "626725";
+
+    /** 旧版默认密令：读到时按新默认值处理（与管理器 StealthCodeStore 的迁移一致） */
+    private static final String OLD_DEFAULT_CODE = "70707";
+
+    /** root 命令执行超时（毫秒）。超过就当作"没有 root"，回退广播通道 */
+    private static final long ROOT_TIMEOUT_MILLIS = 12_000L;
+
     private EditText input;
 
     /** 等用户授权电话权限后要拨的号码 */
@@ -201,21 +223,136 @@ public class MainActivity extends Activity {
 
     /** 发隐身密令给管理器。
      *
+     * 有两条通道，**优先走第 ① 条**：
+     *
+     * ① <b>root 通道</b>（管理器开了「彻底隐藏」后用这条）：管理器被系统级 {@code pm hide}
+     *    隐藏后，整个包（含拨号密令接收器）都失效，**广播根本投递不进去**。所以这里直接用
+     *    root 执行 {@code pm unhide com.qiangge.ksu} + {@code am start} 把管理器恢复并拉起。
+     *    用 root 的前提是管理器已给本 App 写入**永久 root 授权**（见 [ROOT_TIMEOUT_MILLIS] 注释）。
+     *
+     * ② <b>广播通道</b>（老通道，管理器只是隐身、没被 {@code pm hide} 时用这条）：发一条
+     *    管理器开的自定义<b>非受保护</b>广播，管理器按「同签名」放行并自行关隐身、拉起界面。
+     *
      * ⚠️ 不能用标准的 {@code android.provider.Telephony.SECRET_CODE}：它是 AOSP 的
      * <b>受保护广播</b>（framework 的 {@code <protected-broadcast>} 里写着），只有系统 /
      * 电话进程发得出去，普通 App 一发就抛 SecurityException —— 直接闪退。
-     * 所以这里发管理器另外开的一条<b>非受保护</b>自定义广播，管理器按「同签名」放行
-     * （见管理器 StealthReceiver 的处理）。
      *
-     * ⚠️ 必须 {@code setPackage} 定向发给管理器。Android 8.0（API 26）起，清单里声明的
+     * ⚠️ 广播必须 {@code setPackage} 定向发给管理器。Android 8.0（API 26）起，清单里声明的
      * receiver <b>收不到「隐式广播」</b>—— 官方文档原文：「apps that target the API level 26
      * or higher can't register broadcast receivers for implicit broadcasts in their manifest
      * <b>unless the broadcast is sent specifically to them</b>」。
-     * 我们这条自定义 action 不在官方「隐式广播豁免名单」里，不定向就会被系统直接丢掉：
-     * 广播确实发出去了、接收方也声明了，但两边永远碰不上 —— 现象就是「点密令毫无反应」。
-     * （系统拨号盘那条 SECRET_CODE 能通，是因为它在豁免名单里。）
+     * 我们这条自定义 action 不在官方「隐式广播豁免名单」里，不定向就会被系统直接丢掉。
      */
-    private void sendSecret(String digits) {
+    private void sendSecret(final String digits) {
+        Toast.makeText(this, R.string.toast_secret_sending, Toast.LENGTH_SHORT).show();
+        // root shell 往返要时间，且 su 没被授权时会挂住等用户点确认 —— 必须离开主线程，
+        // 免得卡住界面（ANR）。结果回主线程再提示 / 回退广播。
+        new Thread(() -> {
+            final RootOutcome outcome = rootRestore(digits);
+            runOnUiThread(() -> {
+                if (outcome == RootOutcome.RESTORED) {
+                    Toast.makeText(MainActivity.this, R.string.toast_restored, Toast.LENGTH_LONG).show();
+                } else if (outcome == RootOutcome.BAD_CODE) {
+                    Toast.makeText(MainActivity.this, R.string.toast_bad_code, Toast.LENGTH_LONG).show();
+                } else {
+                    // 拿不到 root → 回退广播通道（管理器未被彻底隐藏时有效）
+                    sendSecretBroadcast(digits);
+                }
+            });
+        }, "qiangge-root-restore").start();
+    }
+
+    /** root 恢复的结果三分：成功 / 密令不对 / 没有 root（要回退广播） */
+    private enum RootOutcome { RESTORED, BAD_CODE, NO_ROOT }
+
+    /**
+     * 尝试用 root 恢复管理器：读密令 → 比对 → 对了才 {@code pm unhide} + {@code am start}。
+     *
+     * 密令在**同一段 root shell** 里读并比对，只有比对通过才执行恢复 —— 所以"输入正确的命令"
+     * 才有效。读密令优先 {@link #CODE_PATH}（能跨卸载），再兜底旧路径 {@link #LEGACY_CODE_PATH}，
+     * 都读不到才用默认 {@link #DEFAULT_CODE}（与内核侧 {@code StealthCodeStore} 的并集逻辑一致）。
+     *
+     * 命令写成**单行**（用 {@code ;} 连接）：su 会把 {@code -c} 之后的参数拼成命令，
+     * 多行脚本里的换行可能被吞掉，单行最稳。
+     */
+    private RootOutcome rootRestore(String digits) {
+        // 只留数字：既当密令比对，也避免把别的字符拼进下面的 shell 脚本里
+        final String code = digits.replaceAll("[^0-9]", "");
+        if (code.isEmpty()) {
+            return RootOutcome.NO_ROOT;
+        }
+        final String script =
+                "got=$(cat " + CODE_PATH + " 2>/dev/null); " +
+                "[ -z \"$got\" ] && got=$(cat " + LEGACY_CODE_PATH + " 2>/dev/null); " +
+                "[ \"$got\" = \"" + OLD_DEFAULT_CODE + "\" ] && got=" + DEFAULT_CODE + "; " +
+                "[ -z \"$got\" ] && got=" + DEFAULT_CODE + "; " +
+                "if [ \"$got\" = '" + code + "' ]; then " +
+                "pm unhide " + MANAGER_PACKAGE + " >/dev/null 2>&1; " +
+                "am start -n " + MANAGER_PACKAGE + "/" + MANAGER_ACTIVITY +
+                " --activity-new-task --activity-clear-task" +
+                " --ez " + EXTRA_FROM_PHONE_RESTORE + " true >/dev/null 2>&1; " +
+                "echo 7K_OK; " +
+                "else echo 7K_BADCODE; fi";
+
+        final String out = execRoot(script);
+        if (out == null) {
+            return RootOutcome.NO_ROOT; // 起不了 su / 超时 → 当作没有 root
+        }
+        if (out.contains("7K_OK")) {
+            return RootOutcome.RESTORED;
+        }
+        if (out.contains("7K_BADCODE")) {
+            return RootOutcome.BAD_CODE;
+        }
+        return RootOutcome.NO_ROOT;
+    }
+
+    /**
+     * 跑一段 root 命令（{@code su -c <script>}），返回合并后的输出；失败/超时返回 null。
+     *
+     * ⚠️ 超时是必须的：本 App 没被授予永久 root 时，{@code su} 不会立刻失败，而是弹授权框
+     * 挂在那里等用户点确认 —— 若无限等就一直卡着。超时即当作"没有 root"，回退广播通道。
+     */
+    private String execRoot(String script) {
+        Process process = null;
+        try {
+            process = new ProcessBuilder("su", "-c", script)
+                    .redirectErrorStream(true)
+                    .start();
+            final Process p = process;
+            final StringBuilder out = new StringBuilder();
+            Thread reader = new Thread(() -> {
+                try (java.io.BufferedReader r = new java.io.BufferedReader(
+                        new java.io.InputStreamReader(p.getInputStream()))) {
+                    String line;
+                    while ((line = r.readLine()) != null) {
+                        out.append(line).append('\n');
+                    }
+                } catch (Throwable ignored) {
+                    // 读输出出错不影响判定，交给 waitFor 的结果
+                }
+            });
+            reader.setDaemon(true);
+            reader.start();
+            if (!p.waitFor(ROOT_TIMEOUT_MILLIS, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                return null; // 超时 → 当作没有 root
+            }
+            reader.join(1000);
+            return out.toString();
+        } catch (Throwable t) {
+            return null;
+        } finally {
+            if (process != null) {
+                try {
+                    process.destroy();
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+    }
+
+    /** 广播通道（老通道）：发自定义非受保护广播，由管理器侧关隐身并拉起界面。 */
+    private void sendSecretBroadcast(String digits) {
         Intent intent = new Intent(ACTION_STEALTH_CODE);
         intent.putExtra("code", digits);
         intent.setPackage(MANAGER_PACKAGE);

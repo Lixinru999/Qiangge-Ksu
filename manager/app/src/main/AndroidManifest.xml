@@ -141,6 +141,14 @@
                 android:resource="@xml/filepaths" />
         </provider>
 
+        <!-- 彻底隐藏:最近任务里划掉管理器时,由本服务执行 `pm hide` 把整个包从系统
+             应用列表里抹掉。stopWithTask=false —— 划掉任务时服务不能先被销毁,
+             否则收不到 onTaskRemoved。恢复只能靠已授权的「电话」App 用 root 执行。 -->
+        <service
+            android:name=".ui.security.StealthHideService"
+            android:exported="false"
+            android:stopWithTask="false" />
+
         <service
             android:name=".magica.MagicaService"
             android:directBootAware="true"

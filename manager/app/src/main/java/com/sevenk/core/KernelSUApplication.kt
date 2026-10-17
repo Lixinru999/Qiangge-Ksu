@@ -4,7 +4,6 @@ import android.app.Application
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.os.Build
-import android.os.Bundle
 import android.os.UserManager
 import android.system.Os
 import android.util.Log
@@ -412,6 +411,16 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
         // 「这件事什么时候做」从"启动时无条件做"改成"用户真进那一页才做"。
         // ══════════════════════════════════════════════════════════════════
 
+        // ── 彻底隐藏(v2.34)────────────────────────────────────────────────
+        // 隐藏动作**不在这里**做:它挂在"最近任务里划掉管理器"这个精确动作上,
+        // 由 `StealthHideService.onTaskRemoved` 触发 `pm hide`(见该服务与 Stealth.hidePackage)。
+        //
+        // 早期版本挂在 `onActivityPaused` 上,有两个问题:
+        //   ① 任何一次离开前台都会触发 —— 包括用户为了授权「悬浮窗」跳去系统设置页那一下,
+        //      界面会当场被隐藏,把人锁在外面;
+        //   ② `pm hide` 会把整个包连带拨号密令接收器一起停掉,必须精确到"划掉后台"。
+        // 改由服务精确触发后,这两个问题都不存在了。
+
         val webroot = File(dataDir, "webroot")
         if (!webroot.exists()) {
             webroot.mkdir()
@@ -422,52 +431,6 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
         //    它在 onCreate 里,一抛就是启动即闪退。包起来后最坏只是 rust 的 temp_dir() 用默认值。
         runCatching { Os.setenv("TMPDIR", cacheDir.absolutePath, true) }
             .onFailure { Log.w(TAG, "设置 TMPDIR 失败(忽略): ", it) }
-
-        // ── 彻底隐藏(v2.32):应用进入后台时自动隐藏桌面图标 ──────────────
-        // 触发点:onActivityPaused(最可靠,划掉后台前一定会触发) + onTrimMemory(备用)。
-        // 部分国产 ROM(如联想 ZUI)划掉后台直接杀进程,onTrimMemory 可能来不及触发,
-        // 所以主要靠 onActivityPaused 兜底。
-        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
-            override fun onActivityPaused(a: android.app.Activity) {
-                tryHideLauncher()
-            }
-            override fun onActivityCreated(a: android.app.Activity, b: Bundle?) {}
-            override fun onActivityStarted(a: android.app.Activity) {}
-            override fun onActivityResumed(a: android.app.Activity) {}
-            override fun onActivityStopped(a: android.app.Activity) {}
-            override fun onActivitySaveInstanceState(a: android.app.Activity, b: Bundle) {}
-            override fun onActivityDestroyed(a: android.app.Activity) {}
-        })
-    }
-
-    /**
-     * 彻底隐藏:若「彻底隐藏」开着,**应用退到后台时**隐藏桌面图标。
-     *
-     * ⚠️ v2.33:与「隐身模式」**彻底解耦** —— 只看 [SettingsRepositoryImpl.deepHideEnabled],
-     * 不再要求隐身开着(isActivePersisted)。原因:用户要的是两个**独立**功能
-     * (隐身模式=界面伪装;彻底隐藏=划掉后台自动藏图标+拨号恢复),不该互相绑死。
-     *
-     * hideLauncher 同步执行,确保进程被杀前完成。
-     */
-    private fun tryHideLauncher() {
-        runCatching {
-            val prefs = SettingsRepositoryImpl()
-            if (prefs.deepHideEnabled) {
-                com.sevenk.core.ui.security.Stealth.hideLauncher(this)
-                Log.i(TAG, "彻底隐藏:应用进入后台,已隐藏桌面图标")
-            }
-        }.onFailure { Log.w(TAG, "彻底隐藏:tryHideLauncher 失败(忽略): ", it) }
-    }
-
-    /**
-     * 彻底隐藏的应用级后台监听(备用)。
-     * onActivityPaused 是主触发点,onTrimMemory 作为备用。
-     */
-    override fun onTrimMemory(level: Int) {
-        super.onTrimMemory(level)
-        if (level >= TRIM_MEMORY_UI_HIDDEN) {
-            tryHideLauncher()
-        }
     }
 
     override val viewModelStore: ViewModelStore

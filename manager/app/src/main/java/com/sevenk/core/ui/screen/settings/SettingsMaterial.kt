@@ -951,6 +951,33 @@ fun SettingPagerMaterial(
                     onDismiss = { showHideConfirm.value = false }
                 )
 
+                // 「彻底隐藏」的门禁：开启前必须先给「电话」授予**永久 root**，
+                // 否则 `pm hide` 之后没有任何办法恢复（会被锁死）。见 security/Stealth.kt。
+                val showPhoneRootGrant = rememberSaveable { mutableStateOf(false) }
+                val phoneRootGrantDialog = rememberConfirmDialog(
+                    onConfirm = {
+                        showPhoneRootGrant.value = false
+                        if (Stealth.grantPhoneRoot(context)) {
+                            deepHideEnabled = true
+                            prefsRepo.deepHideEnabled = true
+                            Stealth.startHideService(context)
+                            com.sevenk.core.ui.security.requestOverlayPermissionIfNeeded(context)
+                            android.widget.Toast.makeText(
+                                context,
+                                "已给「电话」授予永久 root，彻底隐藏已开启",
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                        } else {
+                            android.widget.Toast.makeText(
+                                context,
+                                "授权失败：请确认内核是 Qiangge、且本管理器已被内核认主",
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    },
+                    onDismiss = { showPhoneRootGrant.value = false }
+                )
+
                 SegmentedColumn(
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 13.dp),
                     content = buildList {
@@ -997,32 +1024,40 @@ fun SettingPagerMaterial(
                                 }
                             )
                         }
-                        // 彻底隐藏(v2.33):开启后,应用退到后台 → 桌面图标自动消失;
-                        // 拨 *#*#626725#*#* 可恢复图标并自动打开管理器。
+                        // 彻底隐藏(v2.33):开启后,最近任务里划掉管理器 → 用系统级 `pm hide`
+                        // 把整个包从系统应用列表里抹掉;只能靠已授权的「电话」输入密令恢复并打开。
+                        // ⚠️ 开启**必须先给「电话」授予永久 root**,否则隐藏后将无法恢复(会被锁死)。
                         // ⚠️「彻底隐藏」与「隐身模式」**相互独立**,可分别开关。
                         //    若两个都要用,请**先开「彻底隐藏」再开「隐身模式」**——
                         //    因为隐身一开,设置页里的 root 项全隐藏,就找不到这个开关了。
                         add {
-                            val stealthOn = com.sevenk.core.ui.security.Stealth.isEnabled()
                             SegmentedSwitchItem(
                                 icon = Icons.Filled.Lock,
                                 title = "彻底隐藏",
-                                summary = if (!stealthOn)
-                                    "开启后,划掉后台会自动隐藏桌面图标;拨号密令可恢复并自动打开"
-                                else if (deepHideEnabled)
-                                    "已开启:划掉后台后桌面图标会消失,拨 *#*#${stealthCode}#*#* 恢复并自动打开"
+                                summary = if (deepHideEnabled)
+                                    "已开启:划掉最近任务后管理器会从系统里彻底消失;打开「电话」输入 *#*#${stealthCode}#*#* 恢复并自动打开"
                                 else
-                                    "开启后,划掉后台桌面图标会消失;拨 *#*#${stealthCode}#*#* 恢复并自动打开",
+                                    "开启前需先给「电话」授予永久 root;开启后划掉最近任务即彻底隐藏,打开「电话」输入密令恢复",
                                 checked = deepHideEnabled,
                                 onCheckedChange = { v ->
-                                    deepHideEnabled = v
-                                    prefsRepo.deepHideEnabled = v
                                     if (v) {
-                                        // 彻底隐藏必需:拨号密令要从后台拉起管理器,
-                                        // Android 10+ 需要「显示在其他应用上层」权限才允许。
-                                        com.sevenk.core.ui.security.requestOverlayPermissionIfNeeded(context)
+                                        // 门禁:必须先给「电话」授予永久 root,否则 `pm hide` 之后无法恢复
+                                        if (com.sevenk.core.ui.security.Stealth.isPhoneRootGranted(context)) {
+                                            deepHideEnabled = true
+                                            prefsRepo.deepHideEnabled = true
+                                            com.sevenk.core.ui.security.Stealth.startHideService(context)
+                                            // 彻底隐藏必需:拨号密令要从后台拉起管理器,
+                                            // Android 10+ 需要「显示在其他应用上层」权限才允许。
+                                            com.sevenk.core.ui.security.requestOverlayPermissionIfNeeded(context)
+                                        } else {
+                                            showPhoneRootGrant.value = true
+                                        }
                                     } else {
-                                        // 关闭彻底隐藏时立刻把图标恢复回来
+                                        deepHideEnabled = false
+                                        prefsRepo.deepHideEnabled = false
+                                        com.sevenk.core.ui.security.Stealth.stopHideService(context)
+                                        // 兜底:万一之前被 hide 过,先恢复;顺带把桌面入口找回来
+                                        com.sevenk.core.ui.security.Stealth.unhidePackage(context)
                                         com.sevenk.core.ui.security.Stealth.ensureLauncherVisible(context)
                                     }
                                 }
@@ -1168,6 +1203,17 @@ fun SettingPagerMaterial(
                         title = "开启隐身模式?",
                         content = "开启后本管理器会显示为「未安装」,超级用户/模块等页面全部隐藏。\n\n桌面图标保持可见(不会被隐藏,点图标即可进入)。\n\n关闭方式:拨号盘输入 *#*#${stealthCode}#*#*",
                         confirm = "开启"
+                    )
+                }
+
+                // 「彻底隐藏」门禁提示：没给「电话」永久 root 就不允许开启，并给一键授权。
+                if (showPhoneRootGrant.value) {
+                    phoneRootGrantDialog.showConfirm(
+                        title = "先给「电话」授权永久 root",
+                        content = "「彻底隐藏」开启前，必须先给「电话」App 授予永久 root 权限。\n\n" +
+                            "否则一旦隐藏，管理器会从系统里彻底消失，没有任何办法用密令恢复（会被锁死）。\n\n" +
+                            "点「授权并开启」将自动为「电话」写入永久 root 授权；之后打开「电话」输入密令 *#*#${stealthCode}#*#* 即可恢复并打开管理器。",
+                        confirm = "授权并开启"
                     )
                 }
             }
