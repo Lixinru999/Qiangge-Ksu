@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import androidx.compose.ui.platform.LocalContext
 import com.sevenk.core.Natives
-import com.sevenk.core.data.repository.SettingsRepositoryImpl
 
 /**
  * 隐身模式 = **只伪装界面**,不动桌面图标。
@@ -182,40 +181,22 @@ object Stealth {
      *
      * ⚠️ 同步执行:拨号恢复时必须在 startActivity 之前恢复图标。
      *
-     * ⚠️ 彻底隐藏(v2.32):若用户开启了「彻底隐藏」且当前隐身开着,
-     *    这里**不恢复图标**,反而保持隐藏。
-     *
-     * 判据用 [isEnabled] 而非 isActivePersisted:MainActivity.onCreate 时
-     * App 在前台,JNI 调用可靠,能准确读到内核隐身状态。
+     * ⚠️ 彻底隐藏(v2.33)与隐身模式**已彻底解耦**:
+     *    · 本函数**只负责"把图标恢复成启用"**,不再自动隐藏 ——
+     *      否则拨号把图标恢复后,MainActivity.onCreate 一进来又把它藏回去,
+     *      用户会看到"拨完号图标又没了"。
+     *    · "隐藏图标"只由 [hideLauncher] 在**应用退到后台时**触发
+     *      (见 KernelSUApplication.tryHideLauncher),与隐身开关无关。
      */
     fun ensureLauncherVisible(context: Context) {
         runCatching {
             val pm = context.packageManager
             val alias = ComponentName(context.packageName, LAUNCHER_ALIAS)
-            // 彻底隐藏开着 + 隐身开着 → 保持图标隐藏
-            //
-            // ⚠️ 只禁/启用 LauncherAlias,**绝不动 MainActivity**:
+            // ⚠️ 只操作 LauncherAlias,**绝不动 MainActivity**:
             //    · 一旦把 MainActivity 也禁用,包内就"没有任何启用状态的 Activity",
             //      联想 ZUI 等 ROM 会把整个包当成"已停用",**不再投递拨号 SECRET_CODE 广播**
-            //      → 用户拨密令毫无反应,退不出隐身(最怕的锁死事故);
-            //    · 在 onCreate 里禁用当前正在运行的 Activity 组件,系统会**直接结束它**
-            //      → 表现为"一开隐身后台就被清掉"。
-            //    MainActivity 保持可启动,拨号密令才救得回来(见 AndroidManifest 顶部注释)。
-            val deepHide = runCatching {
-                SettingsRepositoryImpl().deepHideEnabled
-            }.getOrDefault(false)
-            if (deepHide && isEnabled()) {
-                if (pm.getComponentEnabledSetting(alias) !=
-                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-                ) {
-                    pm.setComponentEnabledSetting(
-                        alias,
-                        PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                        PackageManager.DONT_KILL_APP
-                    )
-                }
-                return@runCatching
-            }
+            //      → 用户拨密令毫无反应,退不出去(最怕的锁死事故);
+            //    · MainActivity 保持可启动,拨号密令才救得回来(见 AndroidManifest 顶部注释)。
             if (pm.getComponentEnabledSetting(alias) !=
                 PackageManager.COMPONENT_ENABLED_STATE_ENABLED
             ) {

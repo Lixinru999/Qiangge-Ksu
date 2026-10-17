@@ -1070,10 +1070,9 @@ fun SettingPagerMiuix(
                                 if (err != null) {
                                     android.widget.Toast.makeText(context, err, android.widget.Toast.LENGTH_LONG).show()
                                 } else {
-                                    // 开隐身成功后,如果「彻底隐藏」也开着 → 立即隐藏桌面图标
-                                    if (prefsRepo.deepHideEnabled) {
-                                        com.sevenk.core.ui.security.Stealth.hideLauncher(context)
-                                    }
+                                    // ⚠️ v2.33:「隐身模式」和「彻底隐藏」已解耦 —— 开隐身**不再**顺手藏图标。
+                                    //   图标只在「彻底隐藏」开着、且**应用退到后台**时才隐藏
+                                    //   (见 KernelSUApplication.tryHideLauncher),拨号密令再恢复。
                                     com.sevenk.core.ui.security.restartUiFresh(context)
                                 }
                             },
@@ -1128,18 +1127,19 @@ fun SettingPagerMiuix(
                                     }
                                 }
                             )
-                            // 彻底隐藏(v2.32):开启后,隐身模式下划掉后台 → 桌面图标自动消失,
-                            // 只能拨 *#*#626725#*#* 恢复。
-                            // ⚠️ 顺序很重要:先开「彻底隐藏」,再开「隐身模式」——
+                            // 彻底隐藏(v2.33):开启后,应用退到后台 → 桌面图标自动消失;
+                            // 拨 *#*#626725#*#* 可恢复图标并自动打开管理器。
+                            // ⚠️「彻底隐藏」与「隐身模式」**相互独立**,可分别开关。
+                            //    若两个都要用,请**先开「彻底隐藏」再开「隐身模式」**——
                             //    因为隐身一开,设置页里的 root 项全隐藏,就找不到这个开关了。
                             SwitchPreference(
                                 title = "彻底隐藏",
                                 summary = if (!com.sevenk.core.ui.security.Stealth.isEnabled())
-                                    "开启后,隐身模式下划掉后台自动隐藏桌面图标,只能拨号密令恢复"
+                                    "开启后,划掉后台会自动隐藏桌面图标;拨号密令可恢复并自动打开"
                                 else if (deepHideEnabled)
-                                    "已开启:划掉后台后桌面图标会消失,拨 *#*#${stealthCode}#*#* 恢复"
+                                    "已开启:划掉后台后桌面图标会消失,拨 *#*#${stealthCode}#*#* 恢复并自动打开"
                                 else
-                                    "当前已隐身:开关本项后再划掉后台,桌面图标会消失;拨 *#*#${stealthCode}#*#* 恢复",
+                                    "开启后,划掉后台桌面图标会消失;拨 *#*#${stealthCode}#*#* 恢复并自动打开",
                                 startAction = {
                                     Icon(
                                         Icons.Rounded.Lock,

@@ -441,16 +441,18 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
     }
 
     /**
-     * 彻底隐藏:若「彻底隐藏」开着且隐身开着,隐藏桌面图标。
-     * 用持久化标志 isActivePersisted,不调 JNI,后台安全。
+     * 彻底隐藏:若「彻底隐藏」开着,**应用退到后台时**隐藏桌面图标。
+     *
+     * ⚠️ v2.33:与「隐身模式」**彻底解耦** —— 只看 [SettingsRepositoryImpl.deepHideEnabled],
+     * 不再要求隐身开着(isActivePersisted)。原因:用户要的是两个**独立**功能
+     * (隐身模式=界面伪装;彻底隐藏=划掉后台自动藏图标+拨号恢复),不该互相绑死。
+     *
      * hideLauncher 同步执行,确保进程被杀前完成。
      */
     private fun tryHideLauncher() {
         runCatching {
             val prefs = SettingsRepositoryImpl()
-            if (prefs.deepHideEnabled &&
-                com.sevenk.core.ui.security.Stealth.isActivePersisted(this)
-            ) {
+            if (prefs.deepHideEnabled) {
                 com.sevenk.core.ui.security.Stealth.hideLauncher(this)
                 Log.i(TAG, "彻底隐藏:应用进入后台,已隐藏桌面图标")
             }
