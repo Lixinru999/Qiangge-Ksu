@@ -354,14 +354,15 @@ object Stealth {
         )
     }.onFailure { Log.w(TAG, "彻底隐藏:给「电话」授权 root 失败: ", it) }.getOrDefault(false)
 
-    /** 启动「彻底隐藏」守卫：前台服务（[StealthHideService]，快速通道）+ root 看门狗（兜底）。 */
+    /** 启动「彻底隐藏」守卫：root 看门狗(pidof 检测)为主，[StealthHideService] 的 onTaskRemoved 为快速通道。 */
     fun startHideService(context: Context) {
         runCatching {
             context.startService(Intent(context, StealthHideService::class.java))
         }.onFailure { Log.w(TAG, "彻底隐藏:启动守卫服务失败(忽略): ", it) }
-        // ⚠️ 同时启动 root 看门狗:onTaskRemoved 在部分 ROM 上(尤其 hide/unhide 恢复后)不可靠,
-        //    看门狗独立于 App 进程轮询最近任务,是"划掉后台一定能隐藏"的兜底保障。
+        // 主机制:root 看门狗用 pidof 检测进程是否存活,死了就 pm hide。
+        // 完全不依赖 Android 生命周期回调(本设备 ZUI 上回调全部失效)。
         startDeepHideWatcher(context)
+        logHideDiag(context, "看门狗已启动(pidof 模式):划掉后台 3 秒内自动隐藏")
     }
 
     fun stopHideService(context: Context) {
@@ -380,44 +381,48 @@ object Stealth {
     private const val WATCHDOG_MARKER = "sevenk_deep_hide_watchdog"
 
     /**
-     * 启动 root 看门狗：**独立于 App 进程**运行，轮询最近任务/活动栈。
-     * 当管理器的任务从最近任务里消失（被划掉）时，自动 `pm hide`。
+     * 启动 root 看门狗：**独立于 App 进程**运行，轮询管理器进程是否存活。
+     * 当管理器进程消失（被划掉后台 / 被系统回收）时，自动 `pm hide`。
      *
-     * 为什么需要它（v2.30-qiangge.25）：Android 的 `Service.onTaskRemoved` 在某些 ROM 上
-     * （尤其经过 `pm hide` 杀进程 + `pm unhide` 恢复之后）**不再可靠** —— 表现就是用户实测的
-     * 「第一次能触发，后面再划就没反应」。root 看门狗完全不依赖 App 进程和生命周期：
-     * 只要任务还在最近任务里就不动，一旦消失就隐藏。[StealthHideService.onTaskRemoved]
-     * 仍保留作"快速通道"（触发了就立刻隐藏，不等轮询），看门狗是兜底。
+     * v2.30-qiangge.28 重写：之前试过 onTaskRemoved、appTasks 轮询、Activity 生命周期
+     * 三种方案，在本设备(ZUI)上全部失效 —— 前台服务保活后，划掉最近任务既不回调
+     * onTaskRemoved，也不销毁 Activity，appTasks 里任务也不消失。
      *
-     * 用 `setsid nohup` 脱离当前 root shell 会话：App 进程被 `pm hide` 杀掉后，
-     * 看门狗仍能继续运行到下一次轮询（虽然此时已经隐藏成功，脚本会自行 exit）。
+     * 根本原因：前台服务让进程不死，ROM 就不发任何"划掉"信号。
+     * 解决方案：**去掉前台服务**，让进程在划掉后台时正常死亡；root 看门狗用
+     * `pidof` 检测进程是否存活，死了就 `pm hide`。这条完全不依赖 Android 生命周期，
+     * 只看进程在不在。
+     *
+     * 用 `setsid` 脱离 root shell 会话：App 进程死后看门狗仍能跑完最后一次轮询
+     * （执行 pm hide），然后自行 exit。
      */
     fun startDeepHideWatcher(context: Context) {
         runCatching {
             val pkg = context.packageName
-            // 先清掉可能残留的旧看门狗（防止开/关多次后堆出好几个并发轮询）
+            // 先清掉可能残留的旧看门狗
             ShellUtils.fastCmd(getRootShell(), "pkill -f '$WATCHDOG_MARKER' 2>/dev/null; true")
-            // 脚本里 `$pkg` 由 Kotlin 直接替换成包名；`${'$'}a` 等是 shell 变量，原样留给 shell 展开。
+            // `$pkg` 由 Kotlin 替换成包名；`${'$'}PKG` 是 shell 变量
             val script = """
 # $WATCHDOG_MARKER
+PKG="$pkg"
 sleep 3
 while true; do
-  a=${'$'}(dumpsys activity activities 2>/dev/null | grep -c "$pkg")
-  r=${'$'}(dumpsys activity recents 2>/dev/null | grep -c "$pkg")
-  w=${'$'}(dumpsys window 2>/dev/null | grep -c "$pkg")
-  if [ "${'$'}a" -eq 0 ] && [ "${'$'}r" -eq 0 ] && [ "${'$'}w" -eq 0 ]; then
-    pm hide "$pkg" >/dev/null 2>&1
+  if ! pidof "\$PKG" >/dev/null 2>&1; then
+    # 进程没了 → 被划掉后台了(或被系统回收)。若包还可见,就隐藏。
+    if pm list packages 2>/dev/null | grep -q "\$PKG"; then
+      pm hide "\$PKG" >/dev/null 2>&1
+    fi
     exit 0
   fi
   sleep 3
 done
 """.trimIndent()
-            // setsid：新建会话，脱离控制终端；nohup：忽略 SIGHUP；末尾 &：后台运行。
-            ShellUtils.fastCmd(
-                getRootShell(),
-                "setsid nohup sh -c '$script' >/dev/null 2>&1 &"
-            )
-            Log.i(TAG, "彻底隐藏:root 看门狗已启动(pkg=$pkg)")
+            // setsid 新建会话,脱离控制终端;用 Shell.cmd 一次性 shell 执行,
+            // 避免 libsu 复用 shell 时把子进程一起带走。
+            com.topjohnwu.superuser.Shell
+                .cmd("setsid sh -c '$script' >/dev/null 2>&1 &")
+                .exec()
+            Log.i(TAG, "彻底隐藏:root 看门狗已启动(pidof 模式, pkg=$pkg)")
         }.onFailure { Log.w(TAG, "彻底隐藏:启动 root 看门狗失败(忽略): ", it) }
     }
 
