@@ -26,7 +26,6 @@ import com.sevenk.core.data.repository.SettingsRepositoryImpl
 object Stealth {
 
     private const val LAUNCHER_ALIAS = "com.sevenk.core.ui.LauncherAlias"
-    private const val MAIN_ACTIVITY = "com.sevenk.core.ui.MainActivity"
 
     /**
      * 内核 UAPI 里**隐身功能**是哪一版加进来的。
@@ -193,8 +192,15 @@ object Stealth {
         runCatching {
             val pm = context.packageManager
             val alias = ComponentName(context.packageName, LAUNCHER_ALIAS)
-            val main = ComponentName(context.packageName, MAIN_ACTIVITY)
-            // 彻底隐藏开着 + 隐身开着 → 保持图标和主界面都隐藏
+            // 彻底隐藏开着 + 隐身开着 → 保持图标隐藏
+            //
+            // ⚠️ 只禁/启用 LauncherAlias,**绝不动 MainActivity**:
+            //    · 一旦把 MainActivity 也禁用,包内就"没有任何启用状态的 Activity",
+            //      联想 ZUI 等 ROM 会把整个包当成"已停用",**不再投递拨号 SECRET_CODE 广播**
+            //      → 用户拨密令毫无反应,退不出隐身(最怕的锁死事故);
+            //    · 在 onCreate 里禁用当前正在运行的 Activity 组件,系统会**直接结束它**
+            //      → 表现为"一开隐身后台就被清掉"。
+            //    MainActivity 保持可启动,拨号密令才救得回来(见 AndroidManifest 顶部注释)。
             val deepHide = runCatching {
                 SettingsRepositoryImpl().deepHideEnabled
             }.getOrDefault(false)
@@ -208,18 +214,8 @@ object Stealth {
                         PackageManager.DONT_KILL_APP
                     )
                 }
-                if (pm.getComponentEnabledSetting(main) !=
-                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-                ) {
-                    pm.setComponentEnabledSetting(
-                        main,
-                        PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                        PackageManager.DONT_KILL_APP
-                    )
-                }
                 return@runCatching
             }
-            // 恢复图标和主界面
             if (pm.getComponentEnabledSetting(alias) !=
                 PackageManager.COMPONENT_ENABLED_STATE_ENABLED
             ) {
@@ -229,28 +225,19 @@ object Stealth {
                     PackageManager.DONT_KILL_APP
                 )
             }
-            if (pm.getComponentEnabledSetting(main) !=
-                PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-            ) {
-                pm.setComponentEnabledSetting(
-                    main,
-                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-                    PackageManager.DONT_KILL_APP
-                )
-            }
         }
     }
 
     /**
-     * 强制恢复桌面图标和主界面(不检查隐身/彻底隐藏状态)。
+     * 强制恢复桌面图标(不检查隐身/彻底隐藏状态)。
      *
-     * 拨号密令恢复时用:启用 LauncherAlias(桌面图标) + MainActivity(主界面),
-     * 这样用户能从桌面打开管理器,finishRestore 也能 startActivity。
+     * 拨号密令恢复时用:此刻隐身已被关掉,但如果持久化标志写入失败,
+     * ensureLauncherVisible 可能误判"还在隐身"而不恢复图标,
+     * 所以拨号恢复走这个强制路径,一定把图标找回来。
      */
     fun forceShowLauncher(context: Context) {
         runCatching {
             val pm = context.packageManager
-            // 恢复桌面图标
             val alias = ComponentName(context.packageName, LAUNCHER_ALIAS)
             if (pm.getComponentEnabledSetting(alias) !=
                 PackageManager.COMPONENT_ENABLED_STATE_ENABLED
@@ -261,28 +248,13 @@ object Stealth {
                     PackageManager.DONT_KILL_APP
                 )
             }
-            // 恢复主界面(拨号恢复后要能打开管理器)
-            val main = ComponentName(context.packageName, MAIN_ACTIVITY)
-            if (pm.getComponentEnabledSetting(main) !=
-                PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-            ) {
-                pm.setComponentEnabledSetting(
-                    main,
-                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-                    PackageManager.DONT_KILL_APP
-                )
-            }
         }
     }
 
     /**
      * 彻底隐藏:禁用桌面启动器组件,让桌面图标消失。
      *
-     * ⚠️ 只禁用 LauncherAlias,不禁用 MainActivity —— 因为设置页开隐身后
-     *    会调 restartUiFresh → recreate(),如果此刻 MainActivity 被禁用,
-     *    recreate 会失败。MainActivity 的禁用交给 ensureLauncherVisible
-     *    在 MainActivity.onCreate 里处理(不影响当前正在运行的实例,
-     *    只阻止未来的启动)。
+     * ⚠️ 只禁用 LauncherAlias,**绝不禁用 MainActivity**(理由见 [ensureLauncherVisible])。
      *
      * 只能通过拨号密令([StealthReceiver])恢复 —— 恢复时调 [forceShowLauncher]。
      */
