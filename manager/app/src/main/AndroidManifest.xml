@@ -13,6 +13,12 @@
          (「显示在其他应用上层」)的 App 是该限制的官方豁免项之一 ——
          没有它,用户拨密令后管理器不会自动弹出来(实测就是这个原因)。 -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- 彻底隐藏:需要按包名查询「电话」App 的 uid,才能给它写入永久 root 授权、
+         并在开启前做门禁检查。Android 11+ 默认隐藏其它 App,不声明这条的话
+         `getApplicationInfo("com.qiangge.phone")` 会抛 NameNotFoundException ——
+         表现为「授权失败」并且门禁永远判定为"没授权"。 -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
 
 
     <uses-sdk tools:overrideLibrary="top.yukonga.miuix.kmp.blur" />
