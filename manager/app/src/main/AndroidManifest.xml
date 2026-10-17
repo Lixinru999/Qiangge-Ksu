@@ -8,6 +8,11 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- 彻底隐藏:拨号密令恢复时要**从后台**拉起管理器界面。
+         Android 10+ 默认禁止后台启动 Activity,而持有 SYSTEM_ALERT_WINDOW
+         (「显示在其他应用上层」)的 App 是该限制的官方豁免项之一 ——
+         没有它,用户拨密令后管理器不会自动弹出来(实测就是这个原因)。 -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
 
     <uses-sdk tools:overrideLibrary="top.yukonga.miuix.kmp.blur" />
@@ -91,18 +96,10 @@
         <receiver
             android:name=".ui.security.StealthReceiver"
             android:exported="true">
-            <!-- 系统拨号盘那条路：SECRET_CODE 是 AOSP 受保护广播，只有系统/电话进程发得出来 -->
             <intent-filter>
                 <action android:name="android.provider.Telephony.SECRET_CODE" />
-                <action android:name="android.telephony.action.SECRET_CODE" />
 
                 <data android:scheme="android_secret_code" />
-            </intent-filter>
-
-            <!-- 自家「电话」App 那条路：普通 App 发不出受保护的 SECRET_CODE，
-                 所以另开一条非受保护的自定义 action，由代码按「同签名」放行 -->
-            <intent-filter>
-                <action android:name="com.qiangge.ksu.action.STEALTH_CODE" />
             </intent-filter>
         </receiver>
 

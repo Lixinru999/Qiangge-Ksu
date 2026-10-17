@@ -321,3 +321,29 @@ tailrec fun Context.findActivity(): Activity? = when (this) {
     else -> null
 }
 
+/**
+ * 请求「显示在其他应用上层」(SYSTEM_ALERT_WINDOW) 权限 —— 彻底隐藏必需的配套权限。
+ *
+ * 为什么必需:拨号密令恢复时 [StealthReceiver] 要**从后台** startActivity 打开管理器,
+ * 而 Android 10+ 默认禁止后台启动 Activity;持有 SYSTEM_ALERT_WINDOW 的 App 是该限制的
+ * 官方豁免项。没有它,用户拨了正确密令,管理器也**不会自动弹出来**(实测原因就是这个)。
+ *
+ * @return true = 已经拿到权限;false = 还没拿到(已尝试拉起授权页)
+ */
+fun requestOverlayPermissionIfNeeded(context: Context): Boolean {
+    if (android.provider.Settings.canDrawOverlays(context)) return true
+    val activity = context.findActivity()
+    if (activity == null) return false
+    runCatching {
+        activity.startActivity(
+            android.content.Intent(
+                android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                android.net.Uri.parse("package:${activity.packageName}")
+            )
+        )
+    }.onFailure {
+        android.util.Log.w("7kkernel-stealth", "拉起悬浮窗授权页失败(忽略): ", it)
+    }
+    return false
+}
+

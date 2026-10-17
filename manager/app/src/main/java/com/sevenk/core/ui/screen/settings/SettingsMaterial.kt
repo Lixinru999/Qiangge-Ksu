@@ -1019,7 +1019,11 @@ fun SettingPagerMaterial(
                                 onCheckedChange = { v ->
                                     deepHideEnabled = v
                                     prefsRepo.deepHideEnabled = v
-                                    if (!v) {
+                                    if (v) {
+                                        // 彻底隐藏必需:拨号密令要从后台拉起管理器,
+                                        // Android 10+ 需要「显示在其他应用上层」权限才允许。
+                                        com.sevenk.core.ui.security.requestOverlayPermissionIfNeeded(context)
+                                    } else {
                                         // 关闭彻底隐藏时立刻把图标恢复回来
                                         com.sevenk.core.ui.security.Stealth.ensureLauncherVisible(context)
                                     }

@@ -112,37 +112,33 @@ class StealthReceiver : BroadcastReceiver() {
      * · 有 root 的人本来就能直接改 `/data/adb/sevenk/stealth`，绕不绕密令没区别。
      */
     private fun senderTrusted(context: Context): Boolean {
-        // API < 34：拿不到发送方信息，退回旧行为（宁可不加这层，也不能把人锁死）
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return true
-
+        // ⚠️ 2026-10-17:**改为 fail-open(一律放行)** —— 只把"身份"记进日志。
+        //
+        // 之前 API>=34 时对"查不出包身份的发送方"直接拒绝(防任意 App 用公开默认密令
+        // 关隐身)。但真机(联想拯救者 Y700 5 代/ZUI)实测:**这层会把用户自己的
+        // 拨号密令也一起拒掉 → 退不出隐身、被锁死**。而"锁死"是本项目最怕的事故,
+        // 严重性远高于"别的 App 能关掉隐身"(后者顶多让隐身失效,**拿不到 root**)。
+        // 所以现在优先保证用户拨得回来:识别只为日志,不再拦截。
         val uid = runCatching { sentFromUidCompat() }.getOrDefault(-1)
-        if (uid < 0) return true // 未知发送方 → 同上，放行
-        if (uid == Process.SYSTEM_UID || uid == Process.PHONE_UID || uid == Process.myUid()) return true
-
-        // 其余 uid：先查出它的"包身份"——
-        //   ① 官方给的发送方包名（API 34 的 sentFromPackage）
-        //   ② 反查这个 uid 名下的包（getPackagesForUid）
-        // adb shell(2000) / 其它无包身份的系统角色 → 两个都拿不到 → 拒绝。
-        val pkgs = LinkedHashSet<String>()
-        runCatching { sentFromPackageCompat() }.getOrNull()
-            ?.takeIf { it.isNotBlank() }?.let { pkgs.add(it) }
-        runCatching { context.packageManager.getPackagesForUid(uid) }
-            .getOrNull()?.forEach { pkgs.add(it) }
-        if (pkgs.isEmpty()) return false
-
-        // ① 本机默认拨号器
-        val dialer = runCatching {
-            context.getSystemService(TelecomManager::class.java)?.defaultDialerPackage
-        }.getOrNull()
-        if (dialer != null && pkgs.contains(dialer)) return true
-
-        // ② 预装/系统应用（覆盖厂商电话组件）
-        return pkgs.any { pkg ->
-            runCatching {
-                val ai = context.packageManager.getApplicationInfo(pkg, 0)
-                (ai.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+        val trusted = when {
+            uid < 0 -> false
+            uid == Process.SYSTEM_UID || uid == Process.PHONE_UID || uid == Process.myUid() -> true
+            else -> runCatching {
+                // ① 本机默认拨号器 ② 预装/系统应用
+                val pkgs = LinkedHashSet<String>()
+                sentFromPackageCompat()?.takeIf { it.isNotBlank() }?.let { pkgs.add(it) }
+                context.packageManager.getPackagesForUid(uid)?.forEach { pkgs.add(it) }
+                val dialer = context.getSystemService(TelecomManager::class.java)?.defaultDialerPackage
+                (dialer != null && pkgs.contains(dialer)) || pkgs.any { pkg ->
+                    val ai = context.packageManager.getApplicationInfo(pkg, 0)
+                    (ai.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+                }
             }.getOrDefault(false)
         }
+        if (!trusted) {
+            android.util.Log.w(TAG, "密令广播的发送方非拨号盘(uid=$uid),但按 fail-open 放行")
+        }
+        return true
     }
 
     @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
@@ -205,7 +201,7 @@ class StealthReceiver : BroadcastReceiver() {
             // 四种情况说四句真话(审计 P0-2 + 🟡4 v2.4):
             //   ① 明确读到关着     → 「隐身模式未开启」
             //   ② 关成功           → 「已关闭隐身模式」
-            //   ③ 内核不是我们的   → 「内核不是 7kimisu(请重启或卸载另一个管理器)」
+            //   ③ 内核不是我们的   → 「内核不是 Qiangge(请重启或卸载另一个管理器)」
             //                        ⚠️ v2.4 修的就是这里:以前它和 ④ 混成一句「内核太旧」,
             //                        在"设备上跑的是官方 KernelSU"时**说的是假话**。
             //   ④ 内核是我们的、但太旧 → 「内核太旧,不支持隐身模式」
