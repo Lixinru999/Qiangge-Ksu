@@ -440,7 +440,12 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
         if (level >= TRIM_MEMORY_UI_HIDDEN) {
             runCatching {
                 val prefs = SettingsRepositoryImpl()
-                if (prefs.deepHideEnabled && com.sevenk.core.ui.security.Stealth.looksStealthy()) {
+                // 用持久化标志 isActivePersisted 而非 looksStealthy():
+                // 后台 JNI 可能读失败,持久化标志只读 SharedPreferences,极快且可靠。
+                if (prefs.deepHideEnabled &&
+                    com.sevenk.core.ui.security.Stealth.isActivePersisted(this)
+                ) {
+                    // hideLauncher 已改为同步执行,确保进程被杀前完成
                     com.sevenk.core.ui.security.Stealth.hideLauncher(this)
                     Log.i(TAG, "彻底隐藏:应用进入后台,已隐藏桌面图标")
                 }

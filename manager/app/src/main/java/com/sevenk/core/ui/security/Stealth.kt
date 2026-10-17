@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import androidx.compose.ui.platform.LocalContext
 import com.sevenk.core.Natives
+import com.sevenk.core.data.repository.SettingsRepositoryImpl
 
 /**
  * 隐身模式 = **只伪装界面**,不动桌面图标。
@@ -122,8 +123,37 @@ object Stealth {
      */
     fun kernelLooksOurs(): Boolean = runCatching { Natives.isManager }.getOrDefault(false)
 
-    fun setEnabled(enabled: Boolean): Boolean =
-        runCatching { Natives.stealthSet(enabled) }.getOrDefault(false)
+    /**
+     * 持久化隐身标志:setEnabled 成功时写入,后台/进程被kill时不依赖 JNI 也能判断。
+     *
+     * 为什么需要它:onTrimMemory 触发时可能进程正被杀,Natives.stealthState() 可能
+     * 读失败(-1)。有了这个标志,后台只需读 SharedPreferences(极快、不依赖内核),
+     * 就能判断隐身是否开着,决定要不要隐藏桌面图标。
+     */
+    private const val KEY_STEALTH_ACTIVE = "stealth_active_persisted"
+
+    /** 读持久化隐身标志(不调 JNI,后台安全)。与 SettingsRepositoryImpl 共用 "settings" */
+    fun isActivePersisted(context: Context): Boolean =
+        runCatching {
+            context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                .getBoolean(KEY_STEALTH_ACTIVE, false)
+        }.getOrDefault(false)
+
+    private fun setActivePersisted(context: Context, active: Boolean) {
+        runCatching {
+            context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_STEALTH_ACTIVE, active).apply()
+        }
+    }
+
+    fun setEnabled(enabled: Boolean): Boolean {
+        val ok = runCatching { Natives.stealthSet(enabled) }.getOrDefault(false)
+        if (ok) {
+            // 同步持久化标志:用 Application context,后台/重启后仍能读到
+            runCatching { setActivePersisted(com.sevenk.core.ksuApp, enabled) }
+        }
+        return ok
+    }
 
     /**
      * 设置页用:开/关隐身并**把成败说出来**(v2.1,审计 P0-2)。
@@ -154,6 +184,9 @@ object Stealth {
      * ⚠️ 彻底隐藏(v2.32):若用户开启了「彻底隐藏」且当前隐身开着,
      *    这里**不恢复图标**,反而保持隐藏 —— 否则开机/重启后图标自己冒出来,
      *    彻底隐藏就穿帮了。只有拨号密令恢复(隐身被关掉)时才会真正恢复图标。
+     *
+     * 判据用 [isActivePersisted] 而非 kernelState():开机/恢复时 JNI 可能还没准备好,
+     * 持久化标志更可靠。
      */
     fun ensureLauncherVisible(context: Context) {
         Thread {
@@ -162,9 +195,9 @@ object Stealth {
                 val component = ComponentName(context.packageName, LAUNCHER_ALIAS)
                 // 彻底隐藏开着 + 隐身开着 → 保持图标隐藏,不要恢复
                 val deepHide = runCatching {
-                    com.sevenk.core.data.repository.SettingsRepositoryImpl().deepHideEnabled
+                    SettingsRepositoryImpl().deepHideEnabled
                 }.getOrDefault(false)
-                if (deepHide && kernelState() == 1) {
+                if (deepHide && isActivePersisted(context)) {
                     if (pm.getComponentEnabledSetting(component) !=
                         PackageManager.COMPONENT_ENABLED_STATE_DISABLED
                     ) {
@@ -192,25 +225,27 @@ object Stealth {
     /**
      * 彻底隐藏:禁用桌面启动器组件,让桌面图标消失。
      *
+     * ⚠️ 同步执行:此方法在 onTrimMemory(应用进入后台)时被调用,进程可能
+     *    马上被杀,必须在当前线程立即执行完,不能开新线程。
+     *    setComponentEnabledSetting 是 Binder 调用,通常几毫秒,不会 ANR。
+     *
      * 只能通过拨号密令([StealthReceiver])恢复 —— 恢复时会调 [ensureLauncherVisible],
      * 而那一刻隐身已被关掉,所以图标会正常恢复。
      */
     fun hideLauncher(context: Context) {
-        Thread {
-            runCatching {
-                val pm = context.packageManager
-                val component = ComponentName(context.packageName, LAUNCHER_ALIAS)
-                if (pm.getComponentEnabledSetting(component) !=
-                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-                ) {
-                    pm.setComponentEnabledSetting(
-                        component,
-                        PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                        PackageManager.DONT_KILL_APP
-                    )
-                }
+        runCatching {
+            val pm = context.packageManager
+            val component = ComponentName(context.packageName, LAUNCHER_ALIAS)
+            if (pm.getComponentEnabledSetting(component) !=
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+            ) {
+                pm.setComponentEnabledSetting(
+                    component,
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    PackageManager.DONT_KILL_APP
+                )
             }
-        }.start()
+        }
     }
 }
 
