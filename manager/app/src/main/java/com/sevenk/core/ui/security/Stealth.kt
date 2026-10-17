@@ -151,16 +151,6 @@ object Stealth {
         if (ok) {
             // 同步持久化标志:用 Application context,后台/重启后仍能读到
             runCatching { setActivePersisted(com.sevenk.core.ksuApp, enabled) }
-            // 开隐身时,如果「彻底隐藏」也开着 → 立即隐藏桌面图标。
-            // 不在生命周期回调里做(划掉后台=杀进程,onPause/onTrimMemory 可能来不及),
-            // 直接在开隐身这一刻就藏,最可靠。
-            if (enabled) {
-                runCatching {
-                    if (SettingsRepositoryImpl().deepHideEnabled) {
-                        hideLauncher(com.sevenk.core.ksuApp)
-                    }
-                }
-            }
         }
         return ok
     }

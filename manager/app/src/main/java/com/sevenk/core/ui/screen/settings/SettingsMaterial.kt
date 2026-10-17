@@ -942,7 +942,12 @@ fun SettingPagerMaterial(
                         if (err != null) {
                             android.widget.Toast.makeText(context, err, android.widget.Toast.LENGTH_LONG).show()
                         } else {
-                            Stealth.ensureLauncherVisible(context)
+                            // 开隐身成功后,如果「彻底隐藏」也开着 → 立即隐藏桌面图标。
+                            // 不在 Stealth.setEnabled 里做,而是在这里显式调用,
+                            // 避免 setEnabled 内部副作用导致崩溃或逻辑混乱。
+                            if (prefsRepo.deepHideEnabled) {
+                                com.sevenk.core.ui.security.Stealth.hideLauncher(context)
+                            }
                             com.sevenk.core.ui.security.restartUiFresh(context)
                         }
                     },

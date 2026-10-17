@@ -1070,7 +1070,10 @@ fun SettingPagerMiuix(
                                 if (err != null) {
                                     android.widget.Toast.makeText(context, err, android.widget.Toast.LENGTH_LONG).show()
                                 } else {
-                                    Stealth.ensureLauncherVisible(context)
+                                    // 开隐身成功后,如果「彻底隐藏」也开着 → 立即隐藏桌面图标
+                                    if (prefsRepo.deepHideEnabled) {
+                                        com.sevenk.core.ui.security.Stealth.hideLauncher(context)
+                                    }
                                     com.sevenk.core.ui.security.restartUiFresh(context)
                                 }
                             },

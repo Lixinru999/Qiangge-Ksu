@@ -220,34 +220,28 @@ class StealthReceiver : BroadcastReceiver() {
 
     /** 主线程:提示 + 拉起界面 */
     private fun finishRestore(context: Context, plan: RestorePlan, pending: BroadcastReceiver.PendingResult) {
-        if (!plan.showRestore) {
-            runCatching { pending.finish() }
-            return
-        }
-        Toast.makeText(context, plan.message, Toast.LENGTH_LONG).show()
+        try {
+            if (!plan.showRestore) return
+            Toast.makeText(context, plan.message, Toast.LENGTH_LONG).show()
 
-        val launch = Intent(context, MainActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-        }
-        // 强制恢复图标后,给系统一点时间刷新组件状态,再启动 Activity。
-        // pending.finish() 必须在 postDelayed 里调用,否则系统可能提前杀进程。
-        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-            try {
-                val started = runCatching { context.startActivity(launch) }
-                android.util.Log.i(TAG, "启动界面=${started.isSuccess}")
-                if (started.isFailure) {
-                    val launcherIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-                    if (launcherIntent != null) {
-                        launcherIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                        runCatching { context.startActivity(launcherIntent) }
-                    } else {
-                        Toast.makeText(context, "已关闭隐身,请点桌面图标打开管理器", Toast.LENGTH_LONG).show()
-                    }
-                }
-            } finally {
-                runCatching { pending.finish() }
+            // 强制恢复图标后立即启动 MainActivity。
+            // MainActivity 本身不受 LauncherAlias 禁用影响,一定能启动。
+            val launch = Intent(context, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             }
-        }, 300)
+            val started = runCatching { context.startActivity(launch) }
+            android.util.Log.i(TAG, "启动界面=${started.isSuccess}")
+            if (started.isFailure) {
+                // 显式 Intent 失败时,尝试用启动器 Intent 兜底
+                val launcherIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                if (launcherIntent != null) {
+                    launcherIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                    runCatching { context.startActivity(launcherIntent) }
+                }
+            }
+        } finally {
+            runCatching { pending.finish() }
+        }
     }
 
     /** 供主线程收尾用的结果 */
