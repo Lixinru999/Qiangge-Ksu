@@ -407,10 +407,10 @@ object Stealth {
 PKG="$pkg"
 sleep 3
 while true; do
-  if ! pidof "\$PKG" >/dev/null 2>&1; then
+  if ! pidof "${'$'}PKG" >/dev/null 2>&1; then
     # 进程没了 → 被划掉后台了(或被系统回收)。若包还可见,就隐藏。
-    if pm list packages 2>/dev/null | grep -q "\$PKG"; then
-      pm hide "\$PKG" >/dev/null 2>&1
+    if pm list packages 2>/dev/null | grep -q "${'$'}PKG"; then
+      pm hide "${'$'}PKG" >/dev/null 2>&1
     fi
     exit 0
   fi
