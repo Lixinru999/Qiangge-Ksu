@@ -26,6 +26,12 @@ object Stealth {
 
     private const val LAUNCHER_ALIAS = "com.sevenk.core.ui.LauncherAlias"
 
+    /** 主界面组件名。永远保持启用 —— 见 [ensureLauncherVisible] 的说明。 */
+    private const val MAIN_ACTIVITY = "com.sevenk.core.ui.MainActivity"
+
+    /** 拨号密令接收器组件名。保持启用,否则拨号恢复无从谈起。 */
+    private const val STEALTH_RECEIVER = "com.sevenk.core.ui.security.StealthReceiver"
+
     /**
      * 内核 UAPI 里**隐身功能**是哪一版加进来的。
      *
@@ -191,17 +197,27 @@ object Stealth {
     fun ensureLauncherVisible(context: Context) {
         runCatching {
             val pm = context.packageManager
-            val alias = ComponentName(context.packageName, LAUNCHER_ALIAS)
-            // ⚠️ 只操作 LauncherAlias,**绝不动 MainActivity**:
-            //    · 一旦把 MainActivity 也禁用,包内就"没有任何启用状态的 Activity",
-            //      联想 ZUI 等 ROM 会把整个包当成"已停用",**不再投递拨号 SECRET_CODE 广播**
-            //      → 用户拨密令毫无反应,退不出去(最怕的锁死事故);
-            //    · MainActivity 保持可启动,拨号密令才救得回来(见 AndroidManifest 顶部注释)。
-            if (pm.getComponentEnabledSetting(alias) !=
+            // ⚠️ 除了恢复桌面入口,还要**修好可能被历史版本误禁用的组件**:
+            //    · v2.15 曾把 MainActivity 也一起禁用 → 包内"没有任何启用状态的 Activity",
+            //      联想 ZUI 等 ROM 会把整个包当成**已停用**,**不再投递拨号 SECRET_CODE 广播**
+            //      → 拨密令毫无反应、也没有任何日志,正是"彻底锁死"的样子;
+            //    · 之后的版本只把 LauncherAlias 找回来了,忘了 MainActivity,
+            //      于是禁用状态一直残留。这里一并修好。
+            //    ⚠️ 只**启用**,绝不在前台禁用任何组件(禁用 MainActivity 会直接结束当前界面)。
+            enableComponent(pm, ComponentName(context.packageName, LAUNCHER_ALIAS))
+            enableComponent(pm, ComponentName(context.packageName, MAIN_ACTIVITY))
+            enableComponent(pm, ComponentName(context.packageName, STEALTH_RECEIVER))
+        }
+    }
+
+    /** 把一个组件置为 ENABLED(本来就启用就跳过)。 */
+    private fun enableComponent(pm: PackageManager, component: ComponentName) {
+        runCatching {
+            if (pm.getComponentEnabledSetting(component) !=
                 PackageManager.COMPONENT_ENABLED_STATE_ENABLED
             ) {
                 pm.setComponentEnabledSetting(
-                    alias,
+                    component,
                     PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
                     PackageManager.DONT_KILL_APP
                 )
