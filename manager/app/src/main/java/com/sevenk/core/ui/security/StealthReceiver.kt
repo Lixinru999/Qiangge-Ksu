@@ -31,7 +31,17 @@ import com.sevenk.core.ui.MainActivity
  */
 class StealthReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != "android.provider.Telephony.SECRET_CODE") return
+        // 🛡 双通道入口（2026-10-17 回归修复）
+        //   ① 系统拨号盘：android.provider.Telephony.SECRET_CODE，数字在 data 的 host
+        //   ② 自家「电话」App：<applicationId>.action.STEALTH_CODE（非受保护广播），数字在 "code" 附加项
+        //   本机（联想 Y700/ZUI）没有系统拨号器，② 才是真正可用的那条。
+        //   ⚠️ 之前一个 deep-hide 提交把 ② 整段删掉了，于是「电话」App 发的密令被直接丢弃 → 密令彻底失效。
+        val isDialer = intent.action == ACTION_SECRET_CODE
+        val isOwnPhoneApp = intent.action == context.packageName + ".action.STEALTH_CODE"
+        if (!isDialer && !isOwnPhoneApp) return
+
+        val dialed = (if (isDialer) intent.data?.host else intent.getStringExtra(EXTRA_STEALTH_CODE))
+            ?.trim().orEmpty()
 
         // 🔎 诊断(2026-10-17，联想 ZUI 排障)：「接收器到底有没有被系统投递」是这个
         //    项目里最难在外地判断的一件事 —— 之前只能靠 adb/logcat，用户抓不到。
@@ -42,7 +52,7 @@ class StealthReceiver : BroadcastReceiver() {
         runCatching {
             Toast.makeText(
                 context,
-                "密令接收器已触发：" + (intent.data?.host ?: "?"),
+                "密令接收器已触发：" + dialed.ifBlank { "?" },
                 Toast.LENGTH_LONG,
             ).show()
         }
@@ -57,8 +67,7 @@ class StealthReceiver : BroadcastReceiver() {
             return
         }
 
-        // 因为清单里只声明了 scheme,所以会收到"所有"密令。
-        val dialed = intent.data?.host ?: return
+        if (dialed.isEmpty()) return
 
         // 防暴力猜：默认密令是公开的 626725，任何人都能在拨号盘上乱试。
         // 连错到上限就临时挡下（纯内存计数，重启/进程被杀即清 —— 限流窗口只活在本进程内存里，
@@ -344,6 +353,13 @@ class StealthReceiver : BroadcastReceiver() {
 
     companion object {
         const val DEFAULT_SECRET_CODE = "626725"
+
+        /** ① 系统拨号盘的密令广播 action */
+        private const val ACTION_SECRET_CODE = "android.provider.Telephony.SECRET_CODE"
+
+        /** ② 自家「电话」App 把数字放在这个附加项里（与 phone-app 发送侧一致） */
+        private const val EXTRA_STEALTH_CODE = "code"
+
         private const val TAG = "7kkernel-stealth"
 
         /** 「关闭隐身」辅助通知的渠道 id / 渠道名 */

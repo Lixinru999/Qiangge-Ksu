@@ -101,6 +101,14 @@
 
                 <data android:scheme="android_secret_code" />
             </intent-filter>
+
+            <!-- ② 自家「电话」App 的密令入口：本机（联想 Y700/ZUI）没有系统拨号器，
+                 这条才算真正可用的密令通道。与 phone-app 发送侧保持完全一致：
+                 action = <applicationId>.action.STEALTH_CODE，数字放在 "code" 附加项，
+                 发送方用 setPackage 定向到本包名。 -->
+            <intent-filter>
+                <action android:name="${applicationId}.action.STEALTH_CODE" />
+            </intent-filter>
         </receiver>
 
         <!-- 开机后按内核状态重新同步桌面图标 -->
