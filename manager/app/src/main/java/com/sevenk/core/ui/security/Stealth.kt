@@ -151,6 +151,16 @@ object Stealth {
         if (ok) {
             // 同步持久化标志:用 Application context,后台/重启后仍能读到
             runCatching { setActivePersisted(com.sevenk.core.ksuApp, enabled) }
+            // 开隐身时,如果「彻底隐藏」也开着 → 立即隐藏桌面图标。
+            // 不在生命周期回调里做(划掉后台=杀进程,onPause/onTrimMemory 可能来不及),
+            // 直接在开隐身这一刻就藏,最可靠。
+            if (enabled) {
+                runCatching {
+                    if (SettingsRepositoryImpl().deepHideEnabled) {
+                        hideLauncher(com.sevenk.core.ksuApp)
+                    }
+                }
+            }
         }
         return ok
     }
@@ -224,10 +234,33 @@ object Stealth {
     }
 
     /**
+     * 强制恢复桌面图标(不检查隐身/彻底隐藏状态)。
+     *
+     * 拨号密令恢复时用:此刻隐身已被关掉,但如果持久化标志写入失败,
+     * ensureLauncherVisible 可能误判"还在隐身"而不恢复图标。
+     * 所以拨号恢复走这个强制路径,一定把图标找回来。
+     */
+    fun forceShowLauncher(context: Context) {
+        runCatching {
+            val pm = context.packageManager
+            val component = ComponentName(context.packageName, LAUNCHER_ALIAS)
+            if (pm.getComponentEnabledSetting(component) !=
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+            ) {
+                pm.setComponentEnabledSetting(
+                    component,
+                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                    PackageManager.DONT_KILL_APP
+                )
+            }
+        }
+    }
+
+    /**
      * 彻底隐藏:禁用桌面启动器组件,让桌面图标消失。
      *
-     * ⚠️ 同步执行:此方法在 onTrimMemory(应用进入后台)时被调用,进程可能
-     *    马上被杀,必须在当前线程立即执行完,不能开新线程。
+     * ⚠️ 同步执行:此方法在 setEnabled(开隐身)和 onTrimMemory 时被调用,
+     *    进程可能马上被杀,必须在当前线程立即执行完。
      *    setComponentEnabledSetting 是 Binder 调用,通常几毫秒,不会 ANR。
      *
      * 只能通过拨号密令([StealthReceiver])恢复 —— 恢复时会调 [ensureLauncherVisible],

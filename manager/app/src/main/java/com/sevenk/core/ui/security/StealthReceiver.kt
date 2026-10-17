@@ -31,24 +31,20 @@ import com.sevenk.core.ui.MainActivity
  */
 class StealthReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        // 🔒 先验发送方，再看内容：
-        //    本 receiver 是 exported="true"，任何 App 都能给它发广播，所以必须过滤发送方。
+        if (intent.action != "android.provider.Telephony.SECRET_CODE") return
+
+        // 🔒 2026-09-25(朋友审计)：**先验发送方，再看内容**。
+        //    `SECRET_CODE` 不是受保护广播 —— 任何 App 都能自己发一条
+        //    `Intent("android.provider.Telephony.SECRET_CODE", "android_secret_code://626725")`。
+        //    以前只看 action + 拨的号，等于「谁发的都收」：
+        //    任意 App 都能用公开的默认密令 626725 关掉隐身(而且还会顺手起 root shell 读密令)。
         if (!senderTrusted(context)) {
-            android.util.Log.w(TAG, "密令广播来自非可信发送方，已忽略")
+            android.util.Log.w(TAG, "密令广播来自非拨号盘发送方，已忽略")
             return
         }
 
-        // 取「密令数字」。两条来源：
-        //   · 系统拨号盘：SECRET_CODE 广播，数字在 data 的 host（清单只声明了 scheme，
-        //     所以会收到"所有"密令，再由下面和设置里的数字比对）。
-        //     ⚠️ SECRET_CODE 是 AOSP **受保护广播**（framework AndroidManifest.xml 的
-        //     <protected-broadcast>），普通 App 发不出去 —— 它只能来自系统/电话进程。
-        //   · 自家「电话」App：非受保护的自定义 action，数字放在 "code" 附加项里。
-        val dialed = when (intent.action) {
-            SECRET_CODE_ACTION, TELEPHONY_SECRET_CODE_ACTION -> intent.data?.host
-            ACTION_STEALTH_CODE -> intent.getStringExtra(EXTRA_STEALTH_CODE)?.trim()
-            else -> null
-        } ?: return
+        // 因为清单里只声明了 scheme,所以会收到"所有"密令。
+        val dialed = intent.data?.host ?: return
 
         // 防暴力猜：默认密令是公开的 626725，任何人都能在拨号盘上乱试。
         // 连错到上限就临时挡下（纯内存计数，重启/进程被杀即清 —— 限流窗口只活在本进程内存里，
@@ -68,10 +64,9 @@ class StealthReceiver : BroadcastReceiver() {
                 val restore = prepareRestore(context, dialed)
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                     try {
-                        finishRestore(context, restore)
+                        finishRestore(context, restore, pending)
                     } catch (t: Throwable) {
                         android.util.Log.w(TAG, "密令收尾异常", t)
-                    } finally {
                         runCatching { pending.finish() }
                     }
                 }
@@ -135,14 +130,6 @@ class StealthReceiver : BroadcastReceiver() {
             .getOrNull()?.forEach { pkgs.add(it) }
         if (pkgs.isEmpty()) return false
 
-        // ⓪ 自家 App：用本管理器**同一个签名证书**签出来的（典型是随包分发的「电话」App
-        //    com.qiangge.phone —— 它就是隐身密令的拨号入口）。
-        //    它不一定被设成系统默认拨号器，走不了下面 ① 那条路，所以在 ① 之前按签名放行。
-        //    为什么按签名、不按包名：包名能被别人"先卸载真身、再装一个同名假 App"抢走，
-        //    签名伪造不了（只有持有本发布版私钥的人能签出同一张证书）。
-        //    放行的后果上限只是"隐身被关"，拿不到 root —— 与整个 receiver 的定位一致。
-        if (pkgs.any { signedBySelf(context, it) }) return true
-
         // ① 本机默认拨号器
         val dialer = runCatching {
             context.getSystemService(TelecomManager::class.java)?.defaultDialerPackage
@@ -157,34 +144,6 @@ class StealthReceiver : BroadcastReceiver() {
             }.getOrDefault(false)
         }
     }
-
-    /**
-     * 这个包是不是「自家 App」—— 用**本管理器同一个签名证书**签出来的？
-     *
-     * 判据是两边的签名证书集合（SHA-256）完全相等。只有持有本发布版私钥的人能签出
-     * 同一张证书，所以这比"认包名"可靠：包名能被别人先卸载真身再装同名假 App 抢走。
-     * 拿不到签名（查询失败 / 未签名）→ 空集 → 判定不可信。
-     */
-    private fun signedBySelf(context: Context, pkg: String): Boolean {
-        val mine = signersOf(context, context.packageName)
-        if (mine.isEmpty()) return false
-        return signersOf(context, pkg) == mine
-    }
-
-    /** 取某个包的签名证书 SHA-256 集合；拿不到返回空集（= 不可信）。 */
-    private fun signersOf(context: Context, pkg: String): Set<String> = runCatching {
-        val info = context.packageManager.getPackageInfo(
-            pkg,
-            android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES,
-        )
-        val signers = info.signingInfo?.apkContentsSigners ?: return@runCatching emptySet<String>()
-        signers.mapTo(LinkedHashSet()) { certSha256(it.toByteArray()) }
-    }.getOrDefault(emptySet())
-
-    private fun certSha256(bytes: ByteArray): String =
-        java.security.MessageDigest.getInstance("SHA-256")
-            .digest(bytes)
-            .joinToString("") { "%02x".format(it) }
 
     @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     private fun sentFromUidCompat(): Int = sentFromUid
@@ -205,7 +164,7 @@ class StealthReceiver : BroadcastReceiver() {
         val accepted = StealthCodeStore.acceptedCodes(context)
         // 🔒 2026-09-25(朋友审计)：**密令内容一个字都不许进日志**。
         //    以前这里把"用户拨的号"和"我们接受的号"全打了出来，后果是：
-        //    用户手滑拨错一次 → `logcat -d -s Qiangge-stealth` 里就躺着真密令
+        //    用户手滑拨错一次 → `logcat -d -s 7kkernel-stealth` 里就躺着真密令
         //    （adb / root / 系统 bugreport 都能看到）。现在只记数量与状态，不记数字。
         android.util.Log.i(TAG, "收到密令(内容已隐去) 候选=${accepted.size} 隐身状态=$kernelState")
         if (dialed !in accepted) {
@@ -227,7 +186,8 @@ class StealthReceiver : BroadcastReceiver() {
         //    "读失败(-1)"和"明确关着(0)"压成同一个 false,于是文案胡说八道。
         val wasEnabled = kernelState == 1
         val restored = Stealth.setEnabled(false)
-        Stealth.ensureLauncherVisible(context)
+        // 拨号恢复:强制恢复桌面图标(不检查持久化标志,避免标志写入失败导致图标不恢复)
+        Stealth.forceShowLauncher(context)
         // 只有"**原本确实在隐身** 且 **这次确实关成功**"才补通知（见 notifyStealthRestored 注释）。
         // ⚠️ 必须额外看 wasEnabled：Stealth.setEnabled(false) 对**本来就关着**的情况
         //    也会返回成功，光看 restored 会给"本来就没开隐身"的人白发一条
@@ -241,7 +201,7 @@ class StealthReceiver : BroadcastReceiver() {
             // 四种情况说四句真话(审计 P0-2 + 🟡4 v2.4):
             //   ① 明确读到关着     → 「隐身模式未开启」
             //   ② 关成功           → 「已关闭隐身模式」
-            //   ③ 内核不是我们的   → 「内核不是 Qiangge(请重启或卸载另一个管理器)」
+            //   ③ 内核不是我们的   → 「内核不是 7kimisu(请重启或卸载另一个管理器)」
             //                        ⚠️ v2.4 修的就是这里:以前它和 ④ 混成一句「内核太旧」,
             //                        在"设备上跑的是官方 KernelSU"时**说的是假话**。
             //   ④ 内核是我们的、但太旧 → 「内核太旧,不支持隐身模式」
@@ -259,21 +219,35 @@ class StealthReceiver : BroadcastReceiver() {
     }
 
     /** 主线程:提示 + 拉起界面 */
-    private fun finishRestore(context: Context, plan: RestorePlan) {
-        if (!plan.showRestore) return
+    private fun finishRestore(context: Context, plan: RestorePlan, pending: BroadcastReceiver.PendingResult) {
+        if (!plan.showRestore) {
+            runCatching { pending.finish() }
+            return
+        }
         Toast.makeText(context, plan.message, Toast.LENGTH_LONG).show()
 
         val launch = Intent(context, MainActivity::class.java).apply {
-            // 用 CLEAR_TASK 而不是 CLEAR_TOP:后者若已有实例会复用(NEW_INTENT),
-            // 而复用出来的界面拿的是【旧 ViewModel 的旧状态】(隐身时算的"未安装"),
-            // 就会出现"密令恢复成功但界面还是未安装,过一会才好"。清任务重建才是干净的。
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         }
-        val started = runCatching { context.startActivity(launch) }
-        android.util.Log.i(TAG, "启动界面=${started.isSuccess}")
-        if (started.isFailure) {
-            Toast.makeText(context, "已关闭隐身,但界面启动失败,请点桌面图标", Toast.LENGTH_LONG).show()
-        }
+        // 强制恢复图标后,给系统一点时间刷新组件状态,再启动 Activity。
+        // pending.finish() 必须在 postDelayed 里调用,否则系统可能提前杀进程。
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            try {
+                val started = runCatching { context.startActivity(launch) }
+                android.util.Log.i(TAG, "启动界面=${started.isSuccess}")
+                if (started.isFailure) {
+                    val launcherIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                    if (launcherIntent != null) {
+                        launcherIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                        runCatching { context.startActivity(launcherIntent) }
+                    } else {
+                        Toast.makeText(context, "已关闭隐身,请点桌面图标打开管理器", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } finally {
+                runCatching { pending.finish() }
+            }
+        }, 300)
     }
 
     /** 供主线程收尾用的结果 */
@@ -362,26 +336,7 @@ class StealthReceiver : BroadcastReceiver() {
 
     companion object {
         const val DEFAULT_SECRET_CODE = "626725"
-
-        /** 系统拨号盘密令广播（AOSP 受保护广播，只有系统/电话进程能发） */
-        const val SECRET_CODE_ACTION = "android.provider.Telephony.SECRET_CODE"
-
-        /** 个别 ROM 的拨号盘用这个旧名字发密令（同样是受保护广播） */
-        const val TELEPHONY_SECRET_CODE_ACTION = "android.telephony.action.SECRET_CODE"
-
-        /**
-         * 自家「电话」App（com.qiangge.phone）用的密令广播。
-         *
-         * 为什么不用受保护的 [SECRET_CODE_ACTION]：普通 App 发那条会抛 SecurityException，
-         * 所以另开一条**非受保护**的自定义 action；因为 receiver 是 exported 的，
-         * 靠 [senderTrusted] 里的「同签名」判据只放行本发布版的自家 App。
-         */
-        const val ACTION_STEALTH_CODE = "com.qiangge.ksu.action.STEALTH_CODE"
-
-        /** [ACTION_STEALTH_CODE] 里携带密令数字的附加项 key */
-        const val EXTRA_STEALTH_CODE = "code"
-
-        private const val TAG = "Qiangge-stealth"
+        private const val TAG = "7kkernel-stealth"
 
         /** 「关闭隐身」辅助通知的渠道 id / 渠道名 */
         private const val CHANNEL_ID = "stealth_restore"
