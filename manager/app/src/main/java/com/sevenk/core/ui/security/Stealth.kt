@@ -180,26 +180,23 @@ object Stealth {
     /**
      * 确保桌面图标在。每次启动、开机、拨号恢复都调一次。
      *
-     * ⚠️ 同步执行:拨号恢复时必须在 startActivity 之前恢复图标,否则部分 ROM
-     *    会因为"启动入口被禁用"而拒绝拉起 Activity。setComponentEnabledSetting
-     *    是 Binder 调用,通常几毫秒,不会卡主线程。
+     * ⚠️ 同步执行:拨号恢复时必须在 startActivity 之前恢复图标。
      *
      * ⚠️ 彻底隐藏(v2.32):若用户开启了「彻底隐藏」且当前隐身开着,
-     *    这里**不恢复图标**,反而保持隐藏 —— 否则开机/重启后图标自己冒出来,
-     *    彻底隐藏就穿帮了。只有拨号密令恢复(隐身被关掉)时才会真正恢复图标。
+     *    这里**不恢复图标**,反而保持隐藏。
      *
-     * 判据用 [isActivePersisted] 而非 kernelState():开机/恢复时 JNI 可能还没准备好,
-     * 持久化标志更可靠。
+     * 判据用 [isEnabled] 而非 isActivePersisted:MainActivity.onCreate 时
+     * App 在前台,JNI 调用可靠,能准确读到内核隐身状态。
      */
     fun ensureLauncherVisible(context: Context) {
         runCatching {
             val pm = context.packageManager
             val component = ComponentName(context.packageName, LAUNCHER_ALIAS)
-            // 彻底隐藏开着 + 隐身开着 → 保持图标隐藏,不要恢复
+            // 彻底隐藏开着 + 隐身开着 → 保持图标隐藏
             val deepHide = runCatching {
                 SettingsRepositoryImpl().deepHideEnabled
             }.getOrDefault(false)
-            if (deepHide && isActivePersisted(context)) {
+            if (deepHide && isEnabled()) {
                 if (pm.getComponentEnabledSetting(component) !=
                     PackageManager.COMPONENT_ENABLED_STATE_DISABLED
                 ) {
